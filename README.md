@@ -1,8 +1,26 @@
 # MatchUp
 
-Aplicativo Expo/React Native usando Expo SDK 56, Expo Router e `expo-dev-client`.
+MatchUp e um aplicativo mobile para conectar atletas, instituicoes e campeonatos. O projeto usa Expo/React Native com Expo SDK 56, Expo Router e `expo-dev-client`.
 
 Este projeto deve ser executado no Android usando uma **development build** instalada no celular. O Expo Go nao e o fluxo principal deste projeto.
+
+## Estado atual
+
+- Fluxo de autenticacao com telas de splash, login, criacao de conta, recuperacao de senha e verificacao de codigo.
+- Area protegida com navegacao por abas para inicio, explorar, contatos, notificacoes e perfil.
+- Telas placeholder para modulos de atleta, instituicao, campeonatos e chat.
+- Componentes compartilhados de UI em `src/components` e componentes especificos de autenticacao em `src/features/auth`.
+
+## Estrutura principal
+
+```txt
+src/
+  app/                 Rotas do Expo Router
+  components/          Componentes reutilizaveis de UI, cards e layout
+  constants/           Rotas, tema e constantes compartilhadas
+  data/mock/           Espaco para dados mockados de desenvolvimento
+  features/auth/       Componentes e fluxo visual de autenticacao
+```
 
 ## Requisitos
 
