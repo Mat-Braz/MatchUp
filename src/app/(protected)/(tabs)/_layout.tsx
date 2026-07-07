@@ -16,11 +16,7 @@ export default function MainTabsLayout() {
           fontWeight: theme.fontWeights.extraBold,
         },
         tabBarStyle: {
-          height: 74,
-          borderTopColor: theme.colors.border,
-          backgroundColor: theme.colors.surfaceLow,
-          paddingBottom: 10,
-          paddingTop: 8,
+          display: 'none',
         },
       }}
     >

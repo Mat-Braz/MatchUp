@@ -1,21 +1,33 @@
+import { StyleSheet, Text } from 'react-native';
 import { useRouter } from 'expo-router';
 
-import { Button } from '@/components/ui';
 import { authRoutes } from '@/constants/authRoutes';
-import { AuthField, AuthLink, AuthScaffold } from '@/features/auth/components';
+import { AuthHeader, ForgotIllustration, HomeIndicator, PencilButton, PencilField, PencilScreen } from '@/features/auth/components';
 
 export default function ForgotPasswordScreen() {
   const router = useRouter();
 
   return (
-    <AuthScaffold
-      eyebrow="Recuperar acesso"
-      title="Esqueceu a senha?"
-      subtitle="Informe seu e-mail para receber o codigo de recuperacao."
-      footer={<AuthLink href={authRoutes.login} label="Lembrei minha senha" strong />}
-    >
-      <AuthField autoCapitalize="none" keyboardType="email-address" label="E-MAIL" placeholder="seu@email.com" />
-      <Button label="Enviar codigo" onPress={() => router.push(authRoutes.resetPassword)} />
-    </AuthScaffold>
+    <PencilScreen scroll>
+      <AuthHeader title="Esqueceu a senha?" />
+      <Text style={styles.intro}>Informe seu e-mail e enviaremos um código{`\n`}de verificação.</Text>
+      <PencilField label="E-MAIL" placeholder="exemplo@email.com" top={168} left={16} width={358} />
+      <PencilButton label="Enviar código" top={290} left={16} width={358} height={54} onPress={() => router.push(authRoutes.resetPassword)} />
+      <ForgotIllustration />
+      <HomeIndicator />
+    </PencilScreen>
   );
 }
+
+const styles = StyleSheet.create({
+  intro: {
+    position: 'absolute',
+    left: 16,
+    top: 96,
+    width: 358,
+    color: '#B9CCAF',
+    fontSize: 15,
+    fontWeight: '600',
+    lineHeight: 22,
+  },
+});

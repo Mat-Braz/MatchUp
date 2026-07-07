@@ -1,27 +1,27 @@
-# Expo HAS CHANGED
+# MatchUp Agent Notes
 
-Read the exact versioned docs at https://docs.expo.dev/versions/v56.0.0/ before writing any code that touches Expo, React Native, Expo Router, EAS, app config, native behavior, navigation, assets, fonts, splash screen, build profiles, or platform-specific APIs.
+## Expo / Runtime
 
-## Project Context
+- This is Expo SDK 56 (`expo ~56.0.8`, React Native 0.85.3) with Expo Router entrypoint `expo-router/entry`; read `https://docs.expo.dev/versions/v56.0.0/` before changing Expo, Router, EAS, native config, assets, fonts, splash, or platform APIs.
+- Development target is an Android development build via `expo-dev-client`, not Expo Go.
+- Android package is `com.mano_mb.MatchUp` in `app.json`; changing it breaks already installed dev builds unless a new build is installed.
 
-- MatchUp is an Expo SDK 56 / React Native app using Expo Router and `expo-dev-client`.
-- The app is designed to run primarily through an Android development build, not Expo Go.
-- The current package name is `com.mano_mb.MatchUp` in `app.json`; keep it aligned with installed development builds.
-- TypeScript strict mode is enabled and `@/*` resolves to `src/*`.
+## Commands
 
-## Development Rules
+- Install first: `npm install`.
+- Typecheck: `npx --no-install tsc --noEmit`. Avoid `npx tsc --noEmit` before deps are installed; it may fetch the wrong `tsc` package.
+- Start Metro for dev client: `npx expo start --dev-client`.
+- Start/open Android dev client: `npx expo start --dev-client --android`.
+- USB Android often needs `adb reverse tcp:8081 tcp:8081` before starting Metro.
+- Build Android dev client: `npx eas build --platform android --profile development`.
 
-- Keep changes minimal and aligned with the existing structure under `src/app`, `src/components`, `src/constants`, and `src/features`.
-- Preserve the established theme from `src/constants/theme.ts` instead of introducing ad-hoc colors or typography.
-- Use Expo Router route groups consistently: auth screens live in `src/app/(auth)` and protected screens in `src/app/(protected)`.
-- Prefer shared UI primitives from `src/components/ui` before creating new screen-local UI patterns.
-- Do not assume Expo API behavior from memory; verify against the SDK 56 docs first.
+## Structure
 
-## Useful Commands
+- Route groups matter: auth screens are under `src/app/(auth)`, protected tabs under `src/app/(protected)/(tabs)`.
+- `@/*` maps to `src/*`; TypeScript strict mode is enabled in `tsconfig.json`.
+- Shared tokens live in `src/constants/theme.ts`; keep colors aligned with the Pencil/`kg-*` palette instead of inventing new values.
 
-```sh
-npm install
-npx expo start --dev-client
-npx expo start --dev-client --android
-npx eas build --platform android --profile development
-```
+## Design Source
+
+- Visual screens should match the Pencil file `C:/Users/mateu/Desktop/MatchUp_Design/MatchUp.pen`; inspect it with Pencil MCP before changing UI.
+- Current logo/illustration PNG assets in `assets/images` were exported from Pencil nodes and should be reused for matching the design.

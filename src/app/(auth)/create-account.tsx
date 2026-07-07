@@ -1,72 +1,51 @@
 import { StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 
-import { Button } from '@/components/ui';
 import { authRoutes } from '@/constants/authRoutes';
 import { theme } from '@/constants/theme';
-import { AuthLink, AuthScaffold, StepPills } from '@/features/auth/components';
+import { AccountTypeCard, AuthTitle, HomeIndicator, PencilButton, PencilScreen, Progress } from '@/features/auth/components';
 
 export default function CreateAccountScreen() {
   const router = useRouter();
 
   return (
-    <AuthScaffold
-      eyebrow="Criar conta"
-      title="Entre como atleta"
-      subtitle="A conta institucional fica para uma etapa futura. Agora vamos preparar seu acesso de jogador."
-      footer={
-        <View style={styles.footerRow}>
-          <Text style={styles.footerText}>Ja tem conta?</Text>
-          <AuthLink href={authRoutes.login} label="Entrar" strong />
-        </View>
-      }
-    >
-      <StepPills current={0} total={4} />
-      <View style={styles.card}>
-        <Text style={styles.cardKicker}>Perfil disponivel</Text>
-        <Text style={styles.cardTitle}>Atleta</Text>
-        <Text style={styles.cardText}>Crie sua conta para acessar campeonatos, times, partidas e sua carta de atleta.</Text>
-      </View>
-      <Button label="Continuar" onPress={() => router.push(authRoutes.accessData)} />
-    </AuthScaffold>
+    <PencilScreen scroll>
+      <AuthTitle title="Criar conta" subtitle="Escolha como você vai participar do MatchUp" />
+      <Progress current={1} />
+      <AccountTypeCard
+        selected
+        icon="♙"
+        title="Pessoa / Atleta"
+        description="Para atletas, árbitros, staff e participantes. Suas funções serão definidas em cada campeonato."
+        top={215}
+      />
+      <Text style={styles.hint}>Você poderá completar dados específicos depois. Funções como atleta, staff ou árbitro são atribuídas dentro de cada campeonato.</Text>
+      <PencilButton label="Continuar" top={600} onPress={() => router.push(authRoutes.accessData)} />
+      <Text style={styles.loginLink} onPress={() => router.push(authRoutes.login)}>Já tenho conta</Text>
+      <HomeIndicator top={829} />
+    </PencilScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  card: {
-    borderRadius: theme.radius.card,
-    borderWidth: 1,
-    borderColor: theme.colors.borderStrong,
-    backgroundColor: theme.colors.surfaceLow,
-    padding: theme.spacing.xl,
-    gap: theme.spacing.sm,
-  },
-  cardKicker: {
-    color: theme.colors.primary,
-    fontSize: theme.typography.caption,
-    fontWeight: theme.fontWeights.black,
-    textTransform: 'uppercase',
-  },
-  cardTitle: {
-    color: theme.colors.text,
-    fontSize: 28,
-    fontWeight: theme.fontWeights.black,
-  },
-  cardText: {
-    color: theme.colors.textMuted,
-    fontSize: theme.typography.body,
+  hint: {
+    position: 'absolute',
+    left: 24,
+    top: 390,
+    width: 342,
+    color: '#80808A',
+    fontSize: 13,
     fontWeight: theme.fontWeights.semibold,
-    lineHeight: 20,
+    lineHeight: 18,
   },
-  footerRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 6,
-  },
-  footerText: {
+  loginLink: {
+    position: 'absolute',
+    left: 24,
+    top: 672,
+    width: 342,
     color: theme.colors.primary,
     fontSize: 15,
-    fontWeight: theme.fontWeights.bold,
+    fontWeight: theme.fontWeights.extraBold,
+    textAlign: 'center',
   },
 });

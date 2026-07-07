@@ -1,24 +1,22 @@
 import { useRouter } from 'expo-router';
 
-import { Button } from '@/components/ui';
 import { authRoutes } from '@/constants/authRoutes';
-import { AuthField, AuthScaffold, StepPills } from '@/features/auth/components';
+import { AuthTitle, HomeIndicator, PencilButton, PencilField, PencilScreen, Progress } from '@/features/auth/components';
 
 export default function PersonalDataScreen() {
   const router = useRouter();
 
   return (
-    <AuthScaffold
-      eyebrow="Etapa 2 de 3"
-      title="Dados pessoais"
-      subtitle="Complete seu perfil para que organizadores e times reconhecam voce."
-    >
-      <StepPills current={2} total={4} />
-      <AuthField autoCapitalize="words" label="NOME COMPLETO" placeholder="Seu nome" />
-      <AuthField keyboardType="number-pad" label="DATA DE NASCIMENTO" placeholder="DD/MM/AAAA" />
-      <AuthField autoCapitalize="words" label="CIDADE" placeholder="Sua cidade" />
-      <AuthField autoCapitalize="characters" label="POSICAO" placeholder="Ex: ATA, MEI, ZAG" />
-      <Button label="Enviar codigo" onPress={() => router.push(authRoutes.verifyCode)} />
-    </AuthScaffold>
+    <PencilScreen scroll>
+      <AuthTitle title="Dados pessoais" subtitle="Complete seu perfil para participar dos campeonatos" />
+      <Progress current={3} />
+      <PencilField label="DATA DE NASCIMENTO" placeholder="00/00/0000" top={192} />
+      <PencilField label="TELEFONE" placeholder="(00) 00000-0000" top={286} />
+      <PencilField label="CEP" placeholder="00000-000" top={380} />
+      <PencilField label="CIDADE" placeholder="Sua cidade" top={474} />
+      <PencilField label="ESTADO" placeholder="UF" top={568} />
+      <PencilButton label="Criar conta" top={683} onPress={() => router.push(authRoutes.verifyCode)} />
+      <HomeIndicator top={829} />
+    </PencilScreen>
   );
 }

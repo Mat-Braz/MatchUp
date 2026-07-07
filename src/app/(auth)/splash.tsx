@@ -1,27 +1,43 @@
 import { useEffect, useRef } from 'react';
-import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, ImageSourcePropType, Pressable, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 
-import { Screen } from '@/components/ui';
 import { authRoutes } from '@/constants/authRoutes';
 import { theme } from '@/constants/theme';
-import { BrandLogo } from '@/features/auth/components';
+import { PencilScreen, PencilSplashLogo } from '@/features/auth/components';
+
+const soccerBall = require('../../../assets/images/GVsf4.png') as ImageSourcePropType;
 
 export default function SplashScreen() {
   const router = useRouter();
   const rotation = useRef(new Animated.Value(0)).current;
+  const hasNavigated = useRef(false);
+
+  function goToLogin() {
+    if (hasNavigated.current) {
+      return;
+    }
+
+    hasNavigated.current = true;
+    router.replace(authRoutes.login);
+  }
 
   useEffect(() => {
     const animation = Animated.loop(
       Animated.timing(rotation, {
         toValue: 1,
-        duration: 1400,
+        duration: 1200,
         useNativeDriver: true,
       }),
     );
 
     animation.start();
-    return () => animation.stop();
+    const timer = setTimeout(goToLogin, 3000);
+
+    return () => {
+      animation.stop();
+      clearTimeout(timer);
+    };
   }, [rotation]);
 
   const spin = rotation.interpolate({
@@ -30,69 +46,25 @@ export default function SplashScreen() {
   });
 
   return (
-    <Screen contentStyle={styles.screen} scroll={false}>
-      <View style={styles.hero}>
-        <BrandLogo />
-        <Text style={styles.tagline}>Campeonatos, times e partidas no mesmo campo.</Text>
-      </View>
-
-      <View style={styles.ballStage}>
-        <View style={styles.orbit} />
-        <Animated.Text style={[styles.ball, { transform: [{ rotate: spin }] }]}>⚽</Animated.Text>
-      </View>
-
-      <Pressable style={styles.cta} onPress={() => router.push(authRoutes.login)}>
-        <Text style={styles.ctaText}>Entrar no MatchUp</Text>
-      </Pressable>
-    </Screen>
+    <Pressable style={styles.pressArea} onPress={goToLogin}>
+      <PencilScreen>
+        <PencilSplashLogo />
+        <Animated.Image source={soccerBall} style={[styles.ball, { transform: [{ rotate: spin }] }]} resizeMode="contain" />
+      </PencilScreen>
+    </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: {
-    justifyContent: 'space-between',
-    paddingHorizontal: 24,
-    paddingBottom: 40,
-    paddingTop: 88,
-  },
-  hero: {
-    gap: theme.spacing.xxl,
-  },
-  tagline: {
-    maxWidth: 290,
-    color: theme.colors.textMuted,
-    fontSize: 18,
-    fontWeight: theme.fontWeights.semibold,
-    lineHeight: 25,
-  },
-  ballStage: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  orbit: {
-    position: 'absolute',
-    width: 178,
-    height: 178,
-    borderRadius: 89,
-    borderWidth: 1,
-    borderColor: theme.colors.borderStrong,
-    backgroundColor: theme.colors.surfaceLow,
+  pressArea: {
+    flex: 1,
+    backgroundColor: theme.colors.background,
   },
   ball: {
-    fontSize: 118,
-  },
-  cta: {
-    minHeight: 52,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: theme.radius.button,
-    borderWidth: 1,
-    borderColor: theme.colors.primary,
-    backgroundColor: theme.colors.primary,
-  },
-  ctaText: {
-    color: theme.colors.black,
-    fontSize: 15,
-    fontWeight: theme.fontWeights.black,
+    position: 'absolute',
+    left: 164,
+    top: 567,
+    width: 61,
+    height: 61,
   },
 });

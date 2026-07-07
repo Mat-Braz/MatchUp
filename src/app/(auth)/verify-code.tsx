@@ -1,53 +1,45 @@
 import { StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 
-import { Button } from '@/components/ui';
-import { authRoutes } from '@/constants/authRoutes';
 import { theme } from '@/constants/theme';
-import { AuthLink, AuthScaffold, StepPills } from '@/features/auth/components';
+import { AuthHeader, CodeInputs, ConfirmationOverlay, HomeIndicator, OtpIllustration, PencilButton, PencilScreen } from '@/features/auth/components';
 
 export default function VerifyCodeScreen() {
   const router = useRouter();
 
   return (
-    <AuthScaffold
-      eyebrow="Etapa 3 de 3"
-      title="Verifique seu codigo"
-      subtitle="Digite o codigo de 6 digitos enviado para o seu e-mail."
-      footer={<AuthLink href={authRoutes.login} label="Voltar para login" strong />}
-    >
-      <StepPills current={3} total={4} />
-      <View style={styles.codeRow}>
-        {Array.from({ length: 6 }).map((_, index) => (
-          <View key={index} style={styles.codeBox}>
-            <Text style={styles.codeText}>{index === 0 ? '0' : ''}</Text>
-          </View>
-        ))}
-      </View>
-      <AuthLink href={authRoutes.verifyCode} label="Reenviar codigo" align="right" />
-      <Button label="Verificar" onPress={() => router.replace('/(protected)')} />
-    </AuthScaffold>
+    <PencilScreen scroll>
+      <AuthHeader title="Verificação" />
+      <Text style={styles.instruction}>Digite o código de 5 dígitos enviado para{`\n`}o seu e-mail.</Text>
+      <CodeInputs />
+      <Text style={styles.resend}>Reenviar código</Text>
+      <OtpIllustration />
+      <PencilButton label="Verificar" top={738} left={20} width={350} height={58} onPress={() => router.replace('/(protected)')} />
+      <HomeIndicator top={829} />
+      <ConfirmationOverlay title={`Conta criada\ncom sucesso`} message={`Seu cadastro foi realizado, agora você já\npode entrar com sua conta`} buttonLabel="IR PARA O LOGIN" />
+    </PencilScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  codeRow: {
-    flexDirection: 'row',
-    gap: theme.spacing.sm,
+  instruction: {
+    position: 'absolute',
+    left: 20,
+    top: 108,
+    width: 350,
+    color: '#C5C4CC',
+    fontSize: 18,
+    fontWeight: '500',
+    lineHeight: 24,
   },
-  codeBox: {
-    flex: 1,
-    height: 52,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: theme.radius.input,
-    borderWidth: 1,
-    borderColor: theme.colors.borderStrong,
-    backgroundColor: theme.colors.surfaceLow,
-  },
-  codeText: {
-    color: theme.colors.text,
-    fontSize: 20,
-    fontWeight: theme.fontWeights.black,
+  resend: {
+    position: 'absolute',
+    left: 20,
+    top: 324,
+    width: 350,
+    color: theme.colors.primary,
+    fontSize: 16,
+    fontWeight: theme.fontWeights.extraBold,
+    textAlign: 'center',
   },
 });

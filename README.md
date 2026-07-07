@@ -7,8 +7,8 @@ Este projeto deve ser executado no Android usando uma **development build** inst
 ## Estado atual
 
 - Fluxo de autenticacao com telas de splash, login, criacao de conta, recuperacao de senha e verificacao de codigo.
-- Area protegida com navegacao por abas para inicio, explorar, contatos, notificacoes e perfil.
-- Telas placeholder para modulos de atleta, instituicao, campeonatos e chat.
+- Area protegida com navegacao por abas para inicio, explorar, contatos, notificacoes e perfil seguindo o design Pencil.
+- Estrutura preparada para modulos de atleta, instituicao, campeonatos e chat.
 - Componentes compartilhados de UI em `src/components` e componentes especificos de autenticacao em `src/features/auth`.
 
 ## Estrutura principal
