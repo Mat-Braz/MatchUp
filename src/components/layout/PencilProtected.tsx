@@ -1,7 +1,7 @@
 import { Image, ImageSourcePropType, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter, type Href } from 'expo-router';
 
-import { PencilScreen } from '@/features/auth/components';
+import { PencilScreen } from '@/features/auth';
 import { theme } from '@/constants/theme';
 
 const fullLogo = require('../../../assets/images/RgTnC.png') as ImageSourcePropType;

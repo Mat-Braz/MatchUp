@@ -1,88 +1,298 @@
-import { StyleSheet, Text, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useState } from "react";
+import {
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  useWindowDimensions,
+  View,
+} from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { authRoutes } from '@/constants/authRoutes';
-import { theme } from '@/constants/theme';
-import { HomeIndicator, PencilButton, PencilField, PencilFullLogo, PencilScreen } from '@/features/auth/components';
+import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
+
+import { authRoutes } from "@/constants/authRoutes";
+import { theme } from "@/constants/theme";
+import {
+  PencilButton,
+  PencilField,
+  PencilFullLogo,
+  useAuth,
+} from "@/features/auth";
+import { ApiError } from "@/lib/api/graphql";
 
 export default function LoginScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const { height } = useWindowDimensions();
+  const { signIn } = useAuth();
+
+  const [objects, setObjects] = useState({
+    formValues: {
+      email: "",
+      password: "",
+    },
+    error: null as string | null,
+  });
+
+  const [booleans, setBooleans] = useState({
+    passVisible: false,
+    scrollEnabled: false,
+    submitting: false,
+  });
+
+  const { formValues, error } = objects;
+  const { passVisible, scrollEnabled, submitting } = booleans;
+
+  const topPad = Math.max(insets.top, 16) + 20;
+  const bottomPad = Math.max(insets.bottom, 16) + 12;
+  const canSubmit =
+    formValues.email.trim().length > 0 &&
+    formValues.password.length > 0 &&
+    !submitting;
+
+  async function handleLogin() {
+    if (!canSubmit) {
+      return;
+    }
+
+    const normalizedEmail = formValues.email.trim().toLowerCase();
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+      setObjects((current) => ({
+        ...current,
+        error: "Digite um e-mail válido, tipo nome@email.com",
+      }));
+      return;
+    }
+
+    setObjects((current) => ({ ...current, error: null }));
+    setBooleans((current) => ({ ...current, submitting: true }));
+
+    try {
+      await signIn({
+        email: normalizedEmail,
+        password: formValues.password,
+      });
+      router.replace("/(protected)");
+    } catch (err) {
+      const raw = err instanceof ApiError ? err.message : "";
+      const message =
+        raw === "Invalid credentials" ||
+        raw.toLowerCase().includes("invalid credentials")
+          ? "E-mail ou senha inválidos."
+          : raw.toLowerCase().includes("email must be an email")
+            ? "Digite um e-mail válido, tipo nome@email.com"
+            : raw || "Não foi possível entrar. Tente novamente.";
+
+      setObjects((current) => ({ ...current, error: message }));
+    } finally {
+      setBooleans((current) => ({ ...current, submitting: false }));
+    }
+  }
 
   return (
-    <PencilScreen scroll>
-      <View style={styles.logoWrap}>
-        <PencilFullLogo />
-      </View>
-      <Text style={styles.title}>Entrar</Text>
-      <Text style={styles.subtitle}>Acesse seus campeonatos e partidas</Text>
-      <PencilField active label="E-MAIL" placeholder="seu@email.com" top={379} />
-      <PencilField active icon="⌾" label="SENHA" placeholder="Digite sua senha" secure top={449} />
-      <Text style={styles.forgot} onPress={() => router.push(authRoutes.forgotPassword)}>Esqueceu a senha?</Text>
-      <PencilButton height={52} label="Entrar" top={527} onPress={() => router.replace('/(protected)')} />
-      <View style={styles.footerRow}>
-        <Text style={styles.footerText}>Não tem conta?</Text>
-        <Text style={styles.footerTextStrong} onPress={() => router.push(authRoutes.createAccount)}>Criar conta</Text>
-      </View>
-      <HomeIndicator />
-    </PencilScreen>
+    <View style={styles.root}>
+      <KeyboardAvoidingView
+        style={styles.flex}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+      >
+        <ScrollView
+          scrollEnabled={scrollEnabled}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+          bounces={scrollEnabled}
+          contentContainerStyle={[
+            styles.content,
+            {
+              paddingTop: topPad,
+              paddingBottom: bottomPad,
+            },
+          ]}
+          onContentSizeChange={(_, contentHeight) => {
+            setBooleans((current) => ({
+              ...current,
+              scrollEnabled: contentHeight > height - 4,
+            }));
+          }}
+        >
+          <View style={styles.header}>
+            <PencilFullLogo style={styles.logo} />
+            <View style={styles.titleBlock}>
+              <Text style={styles.title}>Entrar</Text>
+              <Text style={styles.subtitle}>
+                Acesse seus campeonatos e partidas
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.form}>
+            <View style={styles.fields}>
+              <PencilField
+                active
+                label="E-MAIL"
+                placeholder="seu@email.com"
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoCorrect={false}
+                textContentType="emailAddress"
+                value={formValues.email}
+                onChangeText={(email) =>
+                  setObjects((current) => ({
+                    ...current,
+                    formValues: { ...current.formValues, email },
+                  }))
+                }
+                editable={!submitting}
+              />
+              <PencilField
+                active
+                label="SENHA"
+                placeholder="Digite sua senha"
+                secure={!passVisible}
+                textContentType="password"
+                value={formValues.password}
+                onChangeText={(password) =>
+                  setObjects((current) => ({
+                    ...current,
+                    formValues: { ...current.formValues, password },
+                  }))
+                }
+                editable={!submitting}
+                icon={
+                  <Ionicons
+                    name={passVisible ? "eye-off-outline" : "eye-outline"}
+                    size={20}
+                  />
+                }
+                onIconPress={() =>
+                  setBooleans((current) => ({
+                    ...current,
+                    passVisible: !current.passVisible,
+                  }))
+                }
+              />
+            </View>
+
+            {error ? <Text style={styles.error}>{error}</Text> : null}
+
+            <Pressable
+              hitSlop={8}
+              onPress={() => router.push(authRoutes.forgotPassword)}
+              style={({ pressed }) => [
+                styles.forgotButton,
+                pressed && styles.linkPressed,
+              ]}
+            >
+              <Text style={styles.forgot}>Esqueceu a senha?</Text>
+            </Pressable>
+
+            <PencilButton
+              height={54}
+              label={submitting ? "Entrando..." : "Entrar"}
+              disabled={!canSubmit}
+              onPress={handleLogin}
+            />
+          </View>
+
+          <View style={styles.footer}>
+            <Text style={styles.footerText}>Não tem conta?</Text>
+            <Pressable
+              hitSlop={8}
+              onPress={() => router.push(authRoutes.createAccount)}
+              style={({ pressed }) => pressed && styles.linkPressed}
+            >
+              <Text style={styles.footerTextStrong}>Criar conta</Text>
+            </Pressable>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  logoWrap: {
-    position: 'absolute',
-    left: 24,
-    top: 78,
-    width: 270,
-    height: 76,
+  root: {
+    flex: 1,
+    backgroundColor: theme.colors.background,
+  },
+  flex: {
+    flex: 1,
+  },
+  content: {
+    flexGrow: 1,
+    paddingHorizontal: 24,
+  },
+  header: {
+    gap: 32,
+  },
+  logo: {
+    width: 200,
+    height: 56,
+  },
+  titleBlock: {
+    gap: 8,
   },
   title: {
-    position: 'absolute',
-    left: 24,
-    top: 224,
-    width: 342,
     color: theme.colors.text,
-    fontSize: 40,
+    fontSize: 38,
     fontWeight: theme.fontWeights.extraBold,
-    lineHeight: 43,
+    lineHeight: 42,
+    letterSpacing: -0.5,
   },
   subtitle: {
-    position: 'absolute',
-    left: 24,
-    top: 280,
-    width: 342,
-    color: '#A6A5B0',
-    fontSize: 16,
-    fontWeight: '500',
+    color: "#A6A5B0",
+    fontSize: 15,
+    fontWeight: "500",
     lineHeight: 22,
+    maxWidth: 300,
+  },
+  form: {
+    marginTop: 40,
+    gap: 18,
+    width: "100%",
+  },
+  fields: {
+    gap: 16,
+  },
+  error: {
+    color: theme.colors.dangerSoft,
+    fontSize: 13,
+    fontWeight: theme.fontWeights.semibold,
+    marginTop: -4,
+  },
+  forgotButton: {
+    alignSelf: "flex-end",
+    marginTop: -4,
+    marginBottom: 4,
   },
   forgot: {
-    position: 'absolute',
-    left: 238,
-    top: 505,
-    color: theme.colors.primary,
-    fontSize: 11,
-    fontWeight: theme.fontWeights.extraBold,
+    color: theme.colors.primarySoft,
+    fontSize: 13,
+    fontWeight: theme.fontWeights.bold,
   },
-  footerRow: {
-    position: 'absolute',
-    left: 24,
-    top: 689,
-    width: 342,
-    height: 58,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 4,
+  footer: {
+    marginTop: "auto",
+    paddingTop: 40,
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 6,
   },
   footerText: {
-    color: theme.colors.primary,
-    fontSize: 15,
-    fontWeight: theme.fontWeights.bold,
+    color: "#80808A",
+    fontSize: 14,
+    fontWeight: theme.fontWeights.semibold,
   },
   footerTextStrong: {
     color: theme.colors.primary,
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: theme.fontWeights.extraBold,
+  },
+  linkPressed: {
+    opacity: 0.7,
   },
 });
