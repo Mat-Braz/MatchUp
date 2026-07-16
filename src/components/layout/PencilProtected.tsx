@@ -1,4 +1,6 @@
 import { Image, ImageSourcePropType, Pressable, StyleSheet, Text, View } from 'react-native';
+
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter, type Href } from 'expo-router';
 
 import { PencilScreen } from '@/features/auth';
@@ -32,11 +34,23 @@ const navIcons = {
 type TabName = 'Início' | 'Explorar' | 'Chat' | 'Notificações' | 'Perfil';
 type NavIconName = keyof typeof navIcons;
 
-export function ProtectedCanvas({ children, active }: { children: React.ReactNode; active: TabName }) {
+export function ProtectedCanvas({
+  children,
+  active,
+  scroll = false,
+  canvasHeight = 844,
+}: {
+  children: React.ReactNode;
+  active: TabName;
+  scroll?: boolean;
+  canvasHeight?: number;
+}) {
+  const navTop = canvasHeight - 105;
+
   return (
-    <PencilScreen>
+    <PencilScreen scroll={scroll} canvasHeight={canvasHeight}>
       {children}
-      <BottomNav active={active} />
+      <BottomNav active={active} top={navTop} />
     </PencilScreen>
   );
 }
@@ -96,29 +110,61 @@ export function Chips({ items, top }: { items: string[]; top: number }) {
   );
 }
 
-export function ChampionshipCard({ top, title, status = 'Inscrições abertas', teams = '16 times' }: { top: number; title: string; status?: string; teams?: string }) {
+export function ChampionshipCard({
+  top,
+  title,
+  status = 'Inscrições abertas',
+  year,
+  dates,
+  teams = '0 times',
+  actionLabel,
+}: {
+  top: number;
+  title: string;
+  status?: string;
+  year?: string;
+  dates?: string;
+  teams?: string;
+  actionLabel?: string;
+}) {
   return (
     <View style={[styles.champCard, { top }]}>
       <View style={styles.cardHeader}>
-        <Text style={styles.cardTitle}>{title}</Text>
+        <Text style={styles.cardTitle} numberOfLines={1}>
+          {title}
+        </Text>
         <Text style={styles.cardStatus}>{status}</Text>
       </View>
-      <Text style={styles.cardSubtitle}>2026</Text>
-      <Text style={styles.cardDates}>10/02/26 — 20/03/26</Text>
+      <Text style={styles.cardSubtitle}>{year ?? '—'}</Text>
+      <Text style={styles.cardDates}>{dates ?? 'Datas a definir'}</Text>
       <View style={styles.cardFooter}>
         <Text style={styles.cardTeams}>{teams}</Text>
-        <View style={styles.smallButton}><Text style={styles.smallButtonText}>Solicitar inscrição</Text></View>
+        {actionLabel ? (
+          <View style={styles.smallButton}>
+            <Text style={styles.smallButtonText}>{actionLabel}</Text>
+          </View>
+        ) : null}
       </View>
     </View>
   );
 }
 
-export function SectionLabel({ top, children, action }: { top: number; children: string; action?: string }) {
+export function SectionLabel({
+  top,
+  children,
+  action,
+  onActionPress,
+}: {
+  top: number;
+  children: string;
+  action?: string;
+  onActionPress?: () => void;
+}) {
   return (
-    <View style={[styles.sectionRow, { top }]}> 
+    <View style={[styles.sectionRow, { top }]}>
       <Text style={styles.sectionTitle}>{children}</Text>
       {action ? (
-        <Pressable style={styles.sectionActionButton}>
+        <Pressable style={styles.sectionActionButton} onPress={onActionPress}>
           <Text style={styles.sectionActionButtonText}>{action}</Text>
         </Pressable>
       ) : null}
@@ -154,25 +200,85 @@ export function NotificationRow({ top, title, message, meta, active = false }: {
   );
 }
 
-export function ProfileMenu({ institution = false }: { institution?: boolean }) {
-  const items = institution
-    ? ['Painel da Instituição', 'Editar Perfil Institucional', 'Campeonatos Criados', 'Solicitações e Inscrições', 'Configurações', 'Sair']
-    : ['Minha Carta', 'Editar Perfil', 'Estatísticas', 'Meus Campeonatos', 'Meus Times', 'Configurações', 'Sair'];
+export type ProfileMenuItem = {
+  key: string;
+  label: string;
+  icon: keyof typeof Ionicons.glyphMap;
+  danger?: boolean;
+  onPress?: () => void;
+};
 
+export function ProfileHeader({
+  name,
+  subtitle,
+  avatarUrl,
+  onChangePhoto,
+}: {
+  name: string;
+  subtitle: string;
+  avatarUrl?: string | null;
+  onChangePhoto?: () => void;
+}) {
   return (
-    <View style={styles.profileMenu}>
-      {items.map((item, index) => (
-        <View key={item} style={styles.menuItem}>
-          <Text style={[styles.menuIcon, item === 'Sair' && styles.dangerText]}>▣</Text>
-          <Text style={[styles.menuText, item === 'Sair' && styles.dangerText]}>{item}</Text>
-          <Text style={[styles.menuChevron, item === 'Sair' && styles.dangerText]}>›</Text>
+    <View style={styles.profileHeader}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Alterar foto de perfil"
+        onPress={onChangePhoto}
+        style={styles.avatarPressable}
+      >
+        <View style={styles.avatarRing}>
+          {avatarUrl ? (
+            <Image source={{ uri: avatarUrl }} style={styles.avatarImage} />
+          ) : (
+            <View style={styles.avatarPlaceholder}>
+              <Ionicons name="person" size={42} color={theme.colors.textDim} />
+            </View>
+          )}
         </View>
+        <Text style={styles.changePhotoText}>alterar</Text>
+      </Pressable>
+      <Text style={styles.profileName}>{name}</Text>
+      <Text style={styles.profileSubtitle}>{subtitle}</Text>
+    </View>
+  );
+}
+
+export function ProfileMenu({
+  items,
+  top = 275,
+}: {
+  items: ProfileMenuItem[];
+  top?: number;
+}) {
+  return (
+    <View style={[styles.profileMenu, { top }]}>
+      {items.map((item) => (
+        <Pressable
+          key={item.key}
+          style={({ pressed }) => [styles.menuItem, pressed && styles.menuItemPressed]}
+          onPress={item.onPress}
+        >
+          <View style={[styles.menuIconWrap, item.danger && styles.menuIconWrapDanger]}>
+            <Ionicons
+              name={item.icon}
+              size={18}
+              color={item.danger ? theme.colors.dangerSoft : theme.colors.primary}
+            />
+          </View>
+          <Text style={[styles.menuText, item.danger && styles.dangerText]}>{item.label}</Text>
+          <Ionicons
+            name="chevron-forward"
+            size={18}
+            color={item.danger ? theme.colors.dangerSoft : '#80808A'}
+          />
+        </Pressable>
       ))}
     </View>
   );
 }
 
-function BottomNav({ active }: { active: TabName }) {
+function BottomNav({ active, top = 739 }: { active: TabName; top?: number }) {
   const router = useRouter();
   const tabs: { label: TabName; icon: NavIconName; route: Href }[] = [
     { label: 'Início', icon: 'home', route: '/(protected)/(tabs)/home' as Href },
@@ -183,7 +289,7 @@ function BottomNav({ active }: { active: TabName }) {
   ];
 
   return (
-    <View style={styles.bottomNav}>
+    <View style={[styles.bottomNav, { top }]}>
       {tabs.map((tab) => {
         const isActive = active === tab.label;
         return (
@@ -528,6 +634,60 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     backgroundColor: theme.colors.primary,
   },
+  profileHeader: {
+    position: 'absolute',
+    left: 24,
+    top: 96,
+    width: 342,
+    alignItems: 'center',
+  },
+  avatarPressable: {
+    alignItems: 'center',
+    gap: 6,
+  },
+  avatarRing: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    borderWidth: 3,
+    borderColor: theme.colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+    backgroundColor: theme.colors.surfaceCard,
+  },
+  avatarImage: {
+    width: 90,
+    height: 90,
+    borderRadius: 45,
+  },
+  avatarPlaceholder: {
+    width: 90,
+    height: 90,
+    borderRadius: 45,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: theme.colors.surfaceLow,
+  },
+  changePhotoText: {
+    color: theme.colors.primarySoft,
+    fontSize: 12,
+    fontWeight: theme.fontWeights.semibold,
+  },
+  profileName: {
+    marginTop: 10,
+    color: theme.colors.text,
+    fontSize: 22,
+    fontWeight: theme.fontWeights.extraBold,
+    textAlign: 'center',
+  },
+  profileSubtitle: {
+    marginTop: 4,
+    color: '#A6A5B0',
+    fontSize: 13,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
   profileMenu: {
     position: 'absolute',
     left: 24,
@@ -536,28 +696,33 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   menuItem: {
-    height: 44,
+    height: 52,
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: 8,
+    borderRadius: 12,
     backgroundColor: theme.colors.surfaceCard,
-    paddingHorizontal: 16,
-    gap: 14,
+    paddingHorizontal: 14,
+    gap: 12,
+  },
+  menuItemPressed: {
+    opacity: 0.85,
+  },
+  menuIconWrap: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: theme.colors.surfaceLow,
+  },
+  menuIconWrapDanger: {
+    backgroundColor: theme.colors.dangerDark,
   },
   menuText: {
     flex: 1,
     color: theme.colors.text,
     fontSize: 14,
     fontWeight: theme.fontWeights.extraBold,
-  },
-  menuIcon: {
-    color: theme.colors.primary,
-    fontSize: 17,
-    fontWeight: theme.fontWeights.extraBold,
-  },
-  menuChevron: {
-    color: '#80808A',
-    fontSize: 18,
   },
   dangerText: {
     color: theme.colors.dangerSoft,

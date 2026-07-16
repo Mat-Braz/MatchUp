@@ -10,6 +10,7 @@ export function PencilButton({
   width = 342,
   height = 56,
   disabled = false,
+  tone = 'primary',
 }: {
   label: string;
   top?: number;
@@ -18,6 +19,7 @@ export function PencilButton({
   width?: number | `${number}%`;
   height?: number;
   disabled?: boolean;
+  tone?: 'primary' | 'danger';
 }) {
   const positioned = top !== undefined;
 
@@ -26,12 +28,15 @@ export function PencilButton({
       disabled={disabled}
       style={[
         styles.button,
+        tone === 'danger' ? styles.buttonDanger : null,
         positioned ? { left, top, width, height } : [styles.buttonFlow, { width: '100%', height }],
         disabled && styles.buttonDisabled,
       ]}
       onPress={onPress}
     >
-      <Text style={styles.buttonLabel}>{label}</Text>
+      <Text style={[styles.buttonLabel, tone === 'danger' && styles.buttonLabelDanger]}>
+        {label}
+      </Text>
     </Pressable>
   );
 }
@@ -44,6 +49,9 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     backgroundColor: theme.colors.primary,
   },
+  buttonDanger: {
+    backgroundColor: theme.colors.danger,
+  },
   buttonFlow: {
     position: 'relative',
     alignSelf: 'stretch',
@@ -55,5 +63,8 @@ const styles = StyleSheet.create({
     color: theme.colors.black,
     fontSize: 16,
     fontWeight: theme.fontWeights.extraBold,
+  },
+  buttonLabelDanger: {
+    color: '#FFFFFF',
   },
 });

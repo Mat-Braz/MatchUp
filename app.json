@@ -35,7 +35,13 @@
           "backgroundColor": "#000000"
         }
       ],
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "O MatchUp precisa acessar suas fotos para atualizar o perfil."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

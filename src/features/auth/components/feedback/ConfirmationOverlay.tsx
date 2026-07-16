@@ -1,4 +1,5 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { type ReactNode } from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { theme } from '@/constants/theme';
 import { PencilButton } from '../form/PencilButton';
@@ -8,29 +9,72 @@ export function ConfirmationOverlay({
   message,
   buttonLabel,
   onPress,
+  variant = 'success',
+  icon,
+  cancelLabel,
+  onCancel,
 }: {
   title: string;
   message: string;
   buttonLabel: string;
   onPress?: () => void;
+  variant?: 'success' | 'danger';
+  icon?: ReactNode;
+  cancelLabel?: string;
+  onCancel?: () => void;
 }) {
+  const isDanger = variant === 'danger';
+  const hasCancel = Boolean(cancelLabel);
+
   return (
     <>
-      <View style={styles.modalDim} />
-      <View style={styles.confirmationCard}>
-        <View style={styles.confirmationIconBall}>
-          <Text style={styles.confirmationIcon}>✓</Text>
+      {onCancel ? (
+        <Pressable
+          accessibilityRole="button"
+          onPress={onCancel}
+          style={styles.modalDim}
+        />
+      ) : (
+        <View style={styles.modalDim} />
+      )}
+      <View style={[styles.confirmationCard, hasCancel && styles.confirmationCardTall]}>
+        <View
+          style={[
+            styles.confirmationIconBall,
+            isDanger && styles.confirmationIconBallDanger,
+          ]}
+        >
+          {icon ?? (
+            <Text
+              style={[
+                styles.confirmationIcon,
+                isDanger && styles.confirmationIconDanger,
+              ]}
+            >
+              {isDanger ? '!' : '✓'}
+            </Text>
+          )}
         </View>
         <Text style={styles.confirmationTitle}>{title}</Text>
         <Text style={styles.confirmationMessage}>{message}</Text>
         <PencilButton
           label={buttonLabel}
-          top={262}
+          top={hasCancel ? 250 : 262}
           left={24}
           width={294}
           height={58}
+          tone={isDanger ? 'danger' : 'primary'}
           onPress={onPress}
         />
+        {hasCancel ? (
+          <Pressable
+            accessibilityRole="button"
+            onPress={onCancel}
+            style={styles.cancelButton}
+          >
+            <Text style={styles.cancelLabel}>{cancelLabel}</Text>
+          </Pressable>
+        ) : null}
       </View>
     </>
   );
@@ -38,12 +82,9 @@ export function ConfirmationOverlay({
 
 const styles = StyleSheet.create({
   modalDim: {
-    position: 'absolute',
-    left: 0,
-    top: 0,
-    width: 390,
-    height: 844,
+    ...StyleSheet.absoluteFill,
     backgroundColor: '#00000099',
+    zIndex: 40,
   },
   confirmationCard: {
     position: 'absolute',
@@ -58,6 +99,10 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.surfaceCard,
     padding: 24,
     gap: 20,
+    zIndex: 41,
+  },
+  confirmationCardTall: {
+    height: 392,
   },
   confirmationIconBall: {
     width: 58,
@@ -67,10 +112,16 @@ const styles = StyleSheet.create({
     borderRadius: 29,
     backgroundColor: theme.colors.primary,
   },
+  confirmationIconBallDanger: {
+    backgroundColor: theme.colors.danger,
+  },
   confirmationIcon: {
     color: theme.colors.black,
     fontSize: 34,
     fontWeight: theme.fontWeights.extraBold,
+  },
+  confirmationIconDanger: {
+    color: '#FFFFFF',
   },
   confirmationTitle: {
     width: 294,
@@ -87,5 +138,19 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     lineHeight: 22,
     textAlign: 'center',
+  },
+  cancelButton: {
+    position: 'absolute',
+    left: 24,
+    top: 324,
+    width: 294,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cancelLabel: {
+    color: theme.colors.textMuted,
+    fontSize: 15,
+    fontWeight: theme.fontWeights.bold,
   },
 });

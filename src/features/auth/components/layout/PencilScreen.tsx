@@ -15,12 +15,22 @@ type PencilScreenProps = {
   children: React.ReactNode;
   scroll?: boolean;
   style?: StyleProp<ViewStyle>;
+  canvasHeight?: number;
 };
 
-export function PencilScreen({ children, scroll = false, style }: PencilScreenProps) {
+export function PencilScreen({
+  children,
+  scroll = false,
+  style,
+  canvasHeight = 844,
+}: PencilScreenProps) {
   const { width, height } = useWindowDimensions();
   const scale = scroll ? width / 390 : Math.min(width / 390, height / 844);
-  const canvas = <View style={[styles.canvas, { transform: [{ scale }] }, style]}>{children}</View>;
+  const canvas = (
+    <View style={[styles.canvas, { height: canvasHeight, transform: [{ scale }] }, style]}>
+      {children}
+    </View>
+  );
 
   if (scroll) {
     return (
@@ -31,7 +41,14 @@ export function PencilScreen({ children, scroll = false, style }: PencilScreenPr
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          <View style={{ width: 390 * scale, height: 844 * scale, alignItems: 'center', justifyContent: 'center' }}>
+          <View
+            style={{
+              width: 390 * scale,
+              height: canvasHeight * scale,
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
             {canvas}
           </View>
         </ScrollView>

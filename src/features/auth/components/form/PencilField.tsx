@@ -56,6 +56,7 @@ export function PencilField({
   active = false,
   secure = false,
   icon,
+  iconSide = 'right',
   onIconPress,
   onBlur,
   onFocus,
@@ -75,6 +76,7 @@ export function PencilField({
   active?: boolean;
   secure?: boolean;
   icon?: ReactNode;
+  iconSide?: 'left' | 'right';
   onIconPress?: () => void;
   onBlur?: () => void;
   onFocus?: () => void;
@@ -90,11 +92,13 @@ export function PencilField({
   const emphasize = focused || active;
   const iconColor = focused ? theme.colors.primary : '#A6A5B0';
   const positioned = top !== undefined;
+  const iconNode = icon ? <FieldIcon icon={icon} color={iconColor} onPress={onIconPress} /> : null;
 
   return (
     <View style={[styles.fieldGroup, positioned ? { left, top, width } : styles.fieldGroupFlow]}>
       <Text style={[styles.fieldLabel, emphasize && styles.fieldLabelFocused]}>{label}</Text>
       <View style={[styles.fieldInput, focused && styles.fieldInputFocused]}>
+        {iconSide === 'left' ? iconNode : null}
         <TextInput
           value={value}
           onChangeText={onChangeText}
@@ -117,7 +121,7 @@ export function PencilField({
           style={styles.fieldText}
           selectionColor={theme.colors.primary}
         />
-        {icon ? <FieldIcon icon={icon} color={iconColor} onPress={onIconPress} /> : null}
+        {iconSide === 'right' ? iconNode : null}
       </View>
     </View>
   );
