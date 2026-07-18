@@ -8,7 +8,6 @@ import { authRoutes } from '@/constants/authRoutes';
 import { theme } from '@/constants/theme';
 import {
   AuthTitle,
-  HomeIndicator,
   PencilButton,
   PencilField,
   PencilScreen,
@@ -127,20 +126,20 @@ export default function AccessDataScreen() {
   }
 
   return (
-    <PencilScreen scroll>
+    <PencilScreen scroll canvasHeight={showSecurity ? 883 : 730}>
       <AuthTitle title="Dados de acesso" subtitle="Crie sua conta de pessoa ou atleta" />
       <Progress current={2} />
       <PencilField
         label="NOME COMPLETO"
         placeholder="Digite seu nome"
-        top={183}
+        top={215}
         value={formValues.name}
         onChangeText={(name) => updateFormValue('name', name)}
       />
       <PencilField
         label="E-MAIL"
         placeholder="exemplo@email.com"
-        top={277}
+        top={309}
         keyboardType="email-address"
         autoCapitalize="none"
         autoCorrect={false}
@@ -152,7 +151,7 @@ export default function AccessDataScreen() {
         label="SENHA"
         placeholder="Min. 8 caracteres"
         secure={!passVisible}
-        top={371}
+        top={403}
         textContentType="newPassword"
         value={formValues.password}
         onChangeText={(password) => updateFormValue('password', password)}
@@ -162,12 +161,12 @@ export default function AccessDataScreen() {
           setBooleans((current) => ({ ...current, passVisible: !current.passVisible }))
         }
       />
-      {showSecurity ? <SecurityCard compact top={455} password={formValues.password} /> : null}
+      {showSecurity ? <SecurityCard compact top={487} password={formValues.password} /> : null}
       <PencilField
         label="CONFIRMAR SENHA"
         placeholder="Repita sua senha"
         secure={!confirmPassVisible}
-        top={showSecurity ? 562 : 465}
+        top={showSecurity ? 650 : 497}
         textContentType="newPassword"
         value={formValues.confirmPassword}
         onChangeText={(confirmPassword) => updateFormValue('confirmPassword', confirmPassword)}
@@ -181,14 +180,13 @@ export default function AccessDataScreen() {
           }))
         }
       />
-      {error ? <Text style={[styles.error, { top: showSecurity ? 652 : 555 }]}>{error}</Text> : null}
+      {error ? <Text style={[styles.error, { top: showSecurity ? 740 : 587 }]}>{error}</Text> : null}
       <PencilButton
         label={checkingEmail ? 'Validando e-mail...' : 'Continuar'}
-        top={686}
+        top={showSecurity ? 774 : 621}
         disabled={!canContinue}
         onPress={handleContinue}
       />
-      <HomeIndicator top={829} />
     </PencilScreen>
   );
 }

@@ -1,4 +1,5 @@
 import {
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -8,12 +9,14 @@ import {
   ViewStyle,
   useWindowDimensions,
 } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
 
 import { theme } from '@/constants/theme';
 
 type PencilScreenProps = {
   children: React.ReactNode;
   scroll?: boolean;
+  keyboardScroll?: boolean;
   style?: StyleProp<ViewStyle>;
   canvasHeight?: number;
 };
@@ -21,22 +24,48 @@ type PencilScreenProps = {
 export function PencilScreen({
   children,
   scroll = false,
+  keyboardScroll = false,
   style,
   canvasHeight = 844,
 }: PencilScreenProps) {
   const { width, height } = useWindowDimensions();
-  const scale = scroll ? width / 390 : Math.min(width / 390, height / 844);
+  const scrollViewRef = useRef<ScrollView>(null);
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
+  const usesScrollView = scroll || keyboardScroll;
+  const scale = usesScrollView ? width / 390 : Math.min(width / 390, height / 844);
+
+  useEffect(() => {
+    if (!keyboardScroll) {
+      return;
+    }
+
+    const showSubscription = Keyboard.addListener('keyboardDidShow', () => {
+      setKeyboardVisible(true);
+    });
+    const hideSubscription = Keyboard.addListener('keyboardDidHide', () => {
+      scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+      setKeyboardVisible(false);
+    });
+
+    return () => {
+      showSubscription.remove();
+      hideSubscription.remove();
+    };
+  }, [keyboardScroll]);
   const canvas = (
     <View style={[styles.canvas, { height: canvasHeight, transform: [{ scale }] }, style]}>
       {children}
     </View>
   );
 
-  if (scroll) {
+  if (usesScrollView) {
     return (
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.root}>
         <ScrollView
+          ref={scrollViewRef}
           style={styles.scroll}
+          scrollEnabled={scroll && !keyboardScroll ? true : keyboardVisible}
+          bounces={scroll && !keyboardScroll ? true : keyboardVisible}
           contentContainerStyle={[styles.scrollContent, { minHeight: height }]}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}

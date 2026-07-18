@@ -169,7 +169,7 @@ export default function VerifyCodeScreen() {
   }
 
   return (
-    <PencilScreen scroll>
+    <PencilScreen keyboardScroll>
       <AuthHeader title="Verificação" onBack={() => router.replace(authRoutes.personalData)} />
       <Text style={styles.instruction}>
         Digite o código de 5 dígitos enviado para{`\n`}

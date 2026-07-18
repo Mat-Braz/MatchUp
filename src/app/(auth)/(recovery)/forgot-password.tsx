@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { StyleSheet, Text } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
 import { useRouter } from 'expo-router';
 
@@ -8,7 +8,6 @@ import { theme } from '@/constants/theme';
 import {
   AuthHeader,
   ForgotIllustration,
-  HomeIndicator,
   PencilButton,
   PencilField,
   PencilScreen,
@@ -81,47 +80,52 @@ export default function ForgotPasswordScreen() {
   }
 
   return (
-    <PencilScreen scroll>
-      <AuthHeader title="Esqueceu a senha?" onBack={() => router.replace(authRoutes.login)} />
-      <Text style={styles.intro}>
-        Informe seu e-mail e enviaremos um código{`\n`}de verificação.
-      </Text>
-      <PencilField
-        label="E-MAIL"
-        placeholder="exemplo@email.com"
-        top={168}
-        left={16}
-        width={358}
-        keyboardType="email-address"
-        autoCapitalize="none"
-        autoCorrect={false}
-        textContentType="emailAddress"
-        value={formValues.email}
-        onChangeText={(email) =>
-          setObjects((current) => ({
-            ...current,
-            error: null,
-            formValues: { ...current.formValues, email },
-          }))
-        }
-      />
-      {error ? <Text style={styles.error}>{error}</Text> : null}
-      <PencilButton
-        label={sending ? 'Enviando...' : 'Enviar código'}
-        top={290}
-        left={16}
-        width={358}
-        height={54}
-        disabled={!canSend}
-        onPress={handleSendCode}
-      />
-      <ForgotIllustration />
-      <HomeIndicator />
+    <PencilScreen>
+      <View style={styles.content}>
+        <AuthHeader title="Esqueceu a senha?" onBack={() => router.replace(authRoutes.login)} />
+        <Text style={styles.intro}>
+          Informe seu e-mail e enviaremos um código{`\n`}de verificação.
+        </Text>
+        <PencilField
+          label="E-MAIL"
+          placeholder="exemplo@email.com"
+          top={168}
+          left={16}
+          width={358}
+          keyboardType="email-address"
+          autoCapitalize="none"
+          autoCorrect={false}
+          textContentType="emailAddress"
+          value={formValues.email}
+          onChangeText={(email) =>
+            setObjects((current) => ({
+              ...current,
+              error: null,
+              formValues: { ...current.formValues, email },
+            }))
+          }
+        />
+        {error ? <Text style={styles.error}>{error}</Text> : null}
+        <PencilButton
+          label={sending ? 'Enviando...' : 'Enviar código'}
+          top={290}
+          left={16}
+          width={358}
+          height={54}
+          disabled={!canSend}
+          onPress={handleSendCode}
+        />
+        <ForgotIllustration />
+      </View>
     </PencilScreen>
   );
 }
 
 const styles = StyleSheet.create({
+  content: {
+    flex: 1,
+    transform: [{ translateY: 48 }],
+  },
   intro: {
     position: 'absolute',
     left: 16,

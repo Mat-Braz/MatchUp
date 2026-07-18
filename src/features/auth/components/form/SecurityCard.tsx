@@ -59,19 +59,32 @@ export function SecurityCard({
       ]}
     >
       <View style={styles.securityHeader}>
-        <Text style={[styles.securityShield, allMet && styles.requirementDone]}>✓</Text>
-        <Text style={styles.securityTitle}>Requisitos de segurança</Text>
+        {!compact ? (
+          <Text style={[styles.securityShield, allMet && styles.requirementDone]}>✓</Text>
+        ) : null}
+        <Text style={[styles.securityTitle, compact && styles.securityTitleCompact]}>
+          Requisitos de segurança
+        </Text>
       </View>
       {requirements.map((item) => (
         <View key={item.label} style={styles.requirementRow}>
-          <Text style={[styles.requirementDot, item.met && styles.requirementDone]}>
-            {item.met ? '✓' : '○'}
+          <Text
+            style={[
+              styles.requirementDot,
+              compact && styles.requirementDotCompact,
+              item.met && styles.requirementDone,
+            ]}
+          >
+            {compact ? '●' : item.met ? '✓' : '○'}
           </Text>
           <Text
+            adjustsFontSizeToFit={compact}
+            minimumFontScale={0.9}
+            numberOfLines={compact ? 1 : undefined}
             style={[
               styles.requirementText,
               compact && styles.requirementTextCompact,
-              item.met && styles.requirementTextDone,
+              item.met && (compact ? styles.requirementTextCompactDone : styles.requirementTextDone),
             ]}
           >
             {item.label}
@@ -98,9 +111,12 @@ const styles = StyleSheet.create({
     left: 24,
     top: 562,
     width: 342,
-    height: 96,
-    padding: 12,
-    gap: 6,
+    height: 142,
+    padding: 14,
+    gap: 8,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    borderRadius: 12,
   },
   securityHeader: {
     flexDirection: 'row',
@@ -117,9 +133,12 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: theme.fontWeights.extraBold,
   },
+  securityTitleCompact: {
+    fontSize: 13,
+  },
   requirementRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: 7,
   },
   requirementDot: {
@@ -127,7 +146,7 @@ const styles = StyleSheet.create({
     fontSize: 11,
   },
   requirementDone: {
-    color: theme.colors.primaryPale,
+    color: theme.colors.primary,
   },
   requirementText: {
     flex: 1,
@@ -136,8 +155,17 @@ const styles = StyleSheet.create({
     fontWeight: theme.fontWeights.bold,
   },
   requirementTextCompact: {
-    color: '#A6A5B0',
-    fontSize: 9.5,
+    color: '#73727D',
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  requirementDotCompact: {
+    color: '#6E6D78',
+    fontSize: 11,
+    lineHeight: 16,
+  },
+  requirementTextCompactDone: {
+    color: theme.colors.primary,
   },
   requirementTextDone: {
     color: theme.colors.textMuted,

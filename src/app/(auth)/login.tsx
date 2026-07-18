@@ -1,12 +1,12 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
-  useWindowDimensions,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -27,8 +27,8 @@ import { ApiError } from "@/lib/api/graphql";
 export default function LoginScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { height } = useWindowDimensions();
   const { signIn } = useAuth();
+  const scrollViewRef = useRef<ScrollView>(null);
 
   const [objects, setObjects] = useState({
     formValues: {
@@ -40,12 +40,27 @@ export default function LoginScreen() {
 
   const [booleans, setBooleans] = useState({
     passVisible: false,
-    scrollEnabled: false,
+    keyboardVisible: false,
     submitting: false,
   });
 
   const { formValues, error } = objects;
-  const { passVisible, scrollEnabled, submitting } = booleans;
+  const { passVisible, keyboardVisible, submitting } = booleans;
+
+  useEffect(() => {
+    const showSubscription = Keyboard.addListener("keyboardDidShow", () => {
+      setBooleans((current) => ({ ...current, keyboardVisible: true }));
+    });
+    const hideSubscription = Keyboard.addListener("keyboardDidHide", () => {
+      scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+      setBooleans((current) => ({ ...current, keyboardVisible: false }));
+    });
+
+    return () => {
+      showSubscription.remove();
+      hideSubscription.remove();
+    };
+  }, []);
 
   const topPad = Math.max(insets.top, 16) + 20;
   const bottomPad = Math.max(insets.bottom, 16) + 12;
@@ -101,10 +116,11 @@ export default function LoginScreen() {
         behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
         <ScrollView
-          scrollEnabled={scrollEnabled}
+          ref={scrollViewRef}
+          scrollEnabled={keyboardVisible}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
-          bounces={scrollEnabled}
+          bounces={keyboardVisible}
           contentContainerStyle={[
             styles.content,
             {
@@ -112,12 +128,6 @@ export default function LoginScreen() {
               paddingBottom: bottomPad,
             },
           ]}
-          onContentSizeChange={(_, contentHeight) => {
-            setBooleans((current) => ({
-              ...current,
-              scrollEnabled: contentHeight > height - 4,
-            }));
-          }}
         >
           <View style={styles.header}>
             <PencilFullLogo style={styles.logo} />
@@ -195,6 +205,7 @@ export default function LoginScreen() {
               label={submitting ? "Entrando..." : "Entrar"}
               disabled={!canSubmit}
               onPress={handleLogin}
+              style={styles.loginButton}
             />
           </View>
 
@@ -273,6 +284,9 @@ const styles = StyleSheet.create({
     color: theme.colors.primarySoft,
     fontSize: 13,
     fontWeight: theme.fontWeights.bold,
+  },
+  loginButton: {
+    marginTop: 25,
   },
   footer: {
     marginTop: "auto",

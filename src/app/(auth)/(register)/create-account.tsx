@@ -8,7 +8,6 @@ import { theme } from '@/constants/theme';
 import {
   AccountTypeCard,
   AuthTitle,
-  HomeIndicator,
   PencilButton,
   PencilScreen,
   Progress,
@@ -44,7 +43,7 @@ export default function CreateAccountScreen() {
   }
 
   return (
-    <PencilScreen scroll>
+    <PencilScreen>
       <AuthTitle
         title="Criar conta"
         subtitle="Escolha como você vai participar do MatchUp"
@@ -73,7 +72,6 @@ export default function CreateAccountScreen() {
       <Text style={styles.loginLink} onPress={() => router.push(authRoutes.login)}>
         Já tenho conta
       </Text>
-      <HomeIndicator top={829} />
     </PencilScreen>
   );
 }
