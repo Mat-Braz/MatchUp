@@ -68,6 +68,7 @@ export type VerifyCodeAndRegisterInput = {
   email: string;
   name: string;
   password: string;
+  cpf: string;
   birthDate: string;
   phone: string;
   cep: string;

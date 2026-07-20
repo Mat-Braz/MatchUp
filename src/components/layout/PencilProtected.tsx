@@ -1,4 +1,13 @@
-import { Image, ImageSourcePropType, Pressable, StyleSheet, Text, View } from 'react-native';
+import {
+  Image,
+  ImageSourcePropType,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+  useWindowDimensions,
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, type Href } from 'expo-router';
@@ -31,7 +40,7 @@ const navIcons = {
   },
 } as const;
 
-type TabName = 'Início' | 'Explorar' | 'Chat' | 'Notificações' | 'Perfil';
+type TabName = 'Início' | 'Explorar' | 'Times' | 'Chat' | 'Notificações' | 'Perfil';
 type NavIconName = keyof typeof navIcons;
 
 export function ProtectedCanvas({
@@ -45,13 +54,24 @@ export function ProtectedCanvas({
   scroll?: boolean;
   canvasHeight?: number;
 }) {
-  const navTop = canvasHeight - 105;
+  const insets = useSafeAreaInsets();
 
   return (
-    <PencilScreen scroll={scroll} canvasHeight={canvasHeight}>
-      {children}
-      <BottomNav active={active} top={navTop} />
-    </PencilScreen>
+    <View style={styles.protectedRoot}>
+      <View style={styles.protectedContent}>
+        <PencilScreen scroll={scroll} canvasHeight={canvasHeight}>
+          {children}
+        </PencilScreen>
+      </View>
+      <View
+        style={[
+          styles.fixedNavBar,
+          { paddingBottom: Math.max(insets.bottom, 10) },
+        ]}
+      >
+        <BottomNav active={active} />
+      </View>
+    </View>
   );
 }
 
@@ -118,6 +138,7 @@ export function ChampionshipCard({
   dates,
   teams = '0 times',
   actionLabel,
+  onPress,
 }: {
   top: number;
   title: string;
@@ -126,9 +147,18 @@ export function ChampionshipCard({
   dates?: string;
   teams?: string;
   actionLabel?: string;
+  onPress?: () => void;
 }) {
   return (
-    <View style={[styles.champCard, { top }]}>
+    <Pressable
+      onPress={onPress}
+      disabled={!onPress}
+      style={({ pressed }) => [
+        styles.champCard,
+        { top },
+        pressed && onPress ? { opacity: 0.9 } : null,
+      ]}
+    >
       <View style={styles.cardHeader}>
         <Text style={styles.cardTitle} numberOfLines={1}>
           {title}
@@ -145,7 +175,7 @@ export function ChampionshipCard({
           </View>
         ) : null}
       </View>
-    </View>
+    </Pressable>
   );
 }
 
@@ -278,24 +308,57 @@ export function ProfileMenu({
   );
 }
 
-function BottomNav({ active, top = 739 }: { active: TabName; top?: number }) {
+function BottomNav({ active }: { active: TabName }) {
   const router = useRouter();
-  const tabs: { label: TabName; icon: NavIconName; route: Href }[] = [
+  const { width } = useWindowDimensions();
+  const tabs: {
+    label: TabName;
+    icon?: NavIconName;
+    ionicon?: keyof typeof Ionicons.glyphMap;
+    route: Href;
+  }[] = [
     { label: 'Início', icon: 'home', route: '/(protected)/(tabs)/home' as Href },
     { label: 'Explorar', icon: 'search', route: '/(protected)/(tabs)/explore' as Href },
+    {
+      label: 'Times',
+      ionicon: 'shield-outline',
+      route: '/(protected)/(tabs)/teams' as Href,
+    },
     { label: 'Chat', icon: 'chat', route: '/(protected)/(tabs)/contacts' as Href },
-    { label: 'Notificações', icon: 'bell', route: '/(protected)/(tabs)/notifications' as Href },
+    {
+      label: 'Notificações',
+      icon: 'bell',
+      route: '/(protected)/(tabs)/notifications' as Href,
+    },
     { label: 'Perfil', icon: 'user', route: '/(protected)/(tabs)/profile' as Href },
   ];
 
   return (
-    <View style={[styles.bottomNav, { top }]}>
+    <View style={[styles.bottomNav, { width: Math.min(width - 20, 370) }]}>
       {tabs.map((tab) => {
         const isActive = active === tab.label;
         return (
-          <Pressable key={tab.label} style={[styles.navItem, isActive && styles.navItemActive]} onPress={() => router.push(tab.route)}>
-            <Image source={navIcons[tab.icon][isActive ? 'active' : 'inactive']} style={styles.navIconImage} resizeMode="contain" />
-            <Text style={[styles.navLabel, isActive && styles.navActive]}>{tab.label}</Text>
+          <Pressable
+            key={tab.label}
+            style={[styles.navItem, isActive && styles.navItemActive]}
+            onPress={() => router.push(tab.route)}
+          >
+            {tab.ionicon ? (
+              <Ionicons
+                name={tab.ionicon}
+                size={20}
+                color={isActive ? theme.colors.primary : '#80808A'}
+              />
+            ) : tab.icon ? (
+              <Image
+                source={navIcons[tab.icon][isActive ? 'active' : 'inactive']}
+                style={styles.navIconImage}
+                resizeMode="contain"
+              />
+            ) : null}
+            <Text style={[styles.navLabel, isActive && styles.navActive]} numberOfLines={1}>
+              {tab.label}
+            </Text>
           </Pressable>
         );
       })}
@@ -304,6 +367,22 @@ function BottomNav({ active, top = 739 }: { active: TabName; top?: number }) {
 }
 
 const styles = StyleSheet.create({
+  protectedRoot: {
+    flex: 1,
+    backgroundColor: theme.colors.background,
+  },
+  protectedContent: {
+    flex: 1,
+  },
+  fixedNavBar: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    alignItems: 'center',
+    backgroundColor: 'transparent',
+    pointerEvents: 'box-none',
+  },
   logoWrap: {
     position: 'absolute',
     left: 24,
@@ -728,20 +807,17 @@ const styles = StyleSheet.create({
     color: theme.colors.dangerSoft,
   },
   bottomNav: {
-    position: 'absolute',
-    left: 16,
-    top: 739,
-    width: 358,
     height: 78,
     flexDirection: 'row',
-    gap: 8,
+    gap: 2,
     justifyContent: 'space-between',
     alignItems: 'center',
     borderRadius: 16,
     borderWidth: 1,
     borderColor: theme.colors.border,
     backgroundColor: theme.colors.surfaceLow,
-    padding: 10,
+    paddingHorizontal: 4,
+    paddingVertical: 8,
   },
   navItem: {
     flex: 1,
@@ -749,7 +825,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 8,
-    gap: 4,
+    gap: 2,
+    paddingHorizontal: 2,
   },
   navItemActive: {
     backgroundColor: theme.colors.surfaceHigh,
@@ -760,9 +837,9 @@ const styles = StyleSheet.create({
   },
   navLabel: {
     color: theme.colors.textDim,
-    fontSize: 11,
+    fontSize: 9,
     fontWeight: theme.fontWeights.extraBold,
-    lineHeight: 15,
+    lineHeight: 12,
   },
   navActive: {
     color: theme.colors.primary,

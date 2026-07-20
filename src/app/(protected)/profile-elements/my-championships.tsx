@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Pressable,
   StyleSheet,
   Text,
@@ -11,6 +10,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 
+import { championshipRoutes } from '@/constants/championshipRoutes';
 import { theme } from '@/constants/theme';
 import { AuthHeader, HomeIndicator, PencilScreen, useAuth } from '@/features/auth';
 import {
@@ -117,6 +117,9 @@ export default function MyChampionshipsScreen() {
             <Pressable
               key={item.id}
               accessibilityRole="button"
+              onPress={() =>
+                router.push(championshipRoutes.detail(item.id) as never)
+              }
               style={({ pressed }) => [
                 styles.champRow,
                 { top: listTop + index * 92 },
@@ -142,9 +145,7 @@ export default function MyChampionshipsScreen() {
       {!loading ? (
         <Pressable
           accessibilityRole="button"
-          onPress={() =>
-            Alert.alert('Em breve', 'A criação de campeonatos estará disponível em breve.')
-          }
+          onPress={() => router.push(championshipRoutes.create as never)}
           style={({ pressed }) => [
             styles.createCard,
             { top: createTop },

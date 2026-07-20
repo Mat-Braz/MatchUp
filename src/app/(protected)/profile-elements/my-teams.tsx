@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Image,
   Pressable,
   StyleSheet,
   Text,
@@ -18,31 +19,27 @@ import {
   type MyTeamItem,
 } from '@/features/teams';
 import { ApiError } from '@/lib/api/graphql';
+import { teamRoutes } from '@/constants/teamRoutes';
 
 export default function MyTeamsScreen() {
   const router = useRouter();
   const { token } = useAuth();
 
   const [teams, setTeams] = useState<MyTeamItem[]>([]);
-  const [booleans, setBooleans] = useState({
-    loading: true,
-  });
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  const { loading } = booleans;
 
   const loadTeams = useCallback(async () => {
     if (!token) {
-      setBooleans({ loading: false });
+      setLoading(false);
       return;
     }
 
-    setBooleans({ loading: true });
+    setLoading(true);
     setError(null);
 
     try {
-      const data = await fetchMyTeams(token);
-      setTeams(data);
+      setTeams(await fetchMyTeams(token));
     } catch (err) {
       setError(
         err instanceof ApiError
@@ -50,7 +47,7 @@ export default function MyTeamsScreen() {
           : 'Não foi possível carregar seus times.',
       );
     } finally {
-      setBooleans({ loading: false });
+      setLoading(false);
     }
   }, [token]);
 
@@ -58,13 +55,13 @@ export default function MyTeamsScreen() {
     void loadTeams();
   }, [loadTeams]);
 
-  const canvasHeight = Math.max(844, 180 + teams.length * 92 + 80);
+  const canvasHeight = Math.max(844, 180 + teams.length * 100 + 120 + 80);
 
   return (
     <PencilScreen scroll canvasHeight={canvasHeight}>
       <AuthHeader title="Meus Times" onBack={() => router.back()} />
       <Text style={styles.subtitle}>
-        Times vinculados aos seus campeonatos e inscrições.
+        Toque em um time para ver ou editar dados, convites e formação.
       </Text>
 
       {loading ? (
@@ -81,19 +78,31 @@ export default function MyTeamsScreen() {
         </Text>
       ) : null}
 
-      {!loading && !error
-        ? teams.map((team, index) => (
+      {!loading && !error ? (
+        <View style={styles.list}>
+          {teams.map((team) => (
             <Pressable
               key={team.id}
               accessibilityRole="button"
+              onPress={() => router.push(teamRoutes.edit(team.teamId) as never)}
               style={({ pressed }) => [
-                styles.teamRow,
-                { top: 132 + index * 92 },
-                pressed && styles.teamRowPressed,
+                styles.teamCard,
+                pressed && styles.pressed,
               ]}
             >
               <View style={styles.teamIcon}>
-                <Ionicons name="shield-outline" size={22} color={theme.colors.primary} />
+                {team.shieldUrl ? (
+                  <Image
+                    source={{ uri: team.shieldUrl }}
+                    style={styles.shieldImg}
+                  />
+                ) : (
+                  <Ionicons
+                    name="shield-outline"
+                    size={22}
+                    color={theme.colors.primary}
+                  />
+                )}
               </View>
               <View style={styles.teamText}>
                 <Text style={styles.teamName} numberOfLines={1}>
@@ -105,8 +114,26 @@ export default function MyTeamsScreen() {
               </View>
               <Ionicons name="chevron-forward" size={18} color="#80808A" />
             </Pressable>
-          ))
-        : null}
+          ))}
+
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => router.push(teamRoutes.form as never)}
+            style={({ pressed }) => [
+              styles.createCard,
+              pressed && styles.pressed,
+            ]}
+          >
+            <View style={styles.createIcon}>
+              <Ionicons name="add" size={22} color={theme.colors.black} />
+            </View>
+            <View style={styles.teamText}>
+              <Text style={styles.teamName}>Criar novo time</Text>
+              <Text style={styles.teamMeta}>Mesma tela da aba Times</Text>
+            </View>
+          </Pressable>
+        </View>
+      ) : null}
 
       <HomeIndicator top={canvasHeight - 24} />
     </PencilScreen>
@@ -154,21 +181,26 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     textAlign: 'center',
   },
-  teamRow: {
+  list: {
     position: 'absolute',
     left: 20,
+    top: 132,
     width: 350,
-    height: 80,
+    gap: 12,
+  },
+  teamCard: {
     borderRadius: 16,
     backgroundColor: theme.colors.surfaceCard,
     borderWidth: 1,
     borderColor: theme.colors.border,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 14,
     gap: 12,
+    minHeight: 80,
   },
-  teamRowPressed: {
+  pressed: {
     opacity: 0.88,
     borderColor: theme.colors.borderStrong,
   },
@@ -181,6 +213,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#12131A',
     borderWidth: 1,
     borderColor: theme.colors.borderStrong,
+    overflow: 'hidden',
+  },
+  shieldImg: {
+    width: 44,
+    height: 44,
   },
   teamText: {
     flex: 1,
@@ -195,5 +232,24 @@ const styles = StyleSheet.create({
     color: '#A6A5B0',
     fontSize: 12,
     fontWeight: '500',
+  },
+  createCard: {
+    height: 80,
+    borderRadius: 16,
+    backgroundColor: theme.colors.surfaceCard,
+    borderWidth: 1,
+    borderColor: theme.colors.borderStrong,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    gap: 12,
+  },
+  createIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: theme.colors.primary,
   },
 });

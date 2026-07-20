@@ -1,5 +1,8 @@
-import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useMemo, useState } from 'react';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+
+import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect, useRouter } from 'expo-router';
 
 import {
   ChampionshipCard,
@@ -8,6 +11,7 @@ import {
   ProtectedCanvas,
   SectionLabel,
 } from '@/components/layout/PencilProtected';
+import { championshipRoutes } from '@/constants/championshipRoutes';
 import { theme } from '@/constants/theme';
 import { useAuth } from '@/features/auth';
 import {
@@ -19,10 +23,14 @@ import {
   teamsCountLabel,
   type Championship,
 } from '@/features/championships';
+import { fetchMyTokenBalance } from '@/features/tokens';
 import { ApiError } from '@/lib/api/graphql';
 
-const RECOMMENDED_SECTION_TOP = 155;
-const RECOMMENDED_LIST_TOP = 190;
+const TOKENS_SECTION_TOP = 155;
+const TOKENS_CARD_TOP = 190;
+const TOKENS_CARD_HEIGHT = 72;
+const RECOMMENDED_SECTION_TOP = TOKENS_CARD_TOP + TOKENS_CARD_HEIGHT + 28;
+const RECOMMENDED_LIST_TOP = RECOMMENDED_SECTION_TOP + 35;
 const CARD_HEIGHT = 150;
 const CARD_GAP = 12;
 const EMPTY_HEIGHT = 220;
@@ -37,66 +45,62 @@ function blockHeight(count: number): number {
 }
 
 export default function HomeScreen() {
+  const router = useRouter();
   const { token } = useAuth();
 
   const [objects, setObjects] = useState({
     recommended: [] as Championship[],
     mine: [] as Championship[],
+    tokenBalance: 0,
     error: null as string | null,
   });
   const [booleans, setBooleans] = useState({
     loading: true,
   });
 
-  const { recommended, mine, error } = objects;
+  const { recommended, mine, tokenBalance, error } = objects;
   const { loading } = booleans;
 
-  useEffect(() => {
+  const loadHome = useCallback(async () => {
     if (!token) {
       setBooleans({ loading: false });
       return;
     }
 
-    let cancelled = false;
+    setBooleans({ loading: true });
+    setObjects((current) => ({ ...current, error: null }));
 
-    (async () => {
-      setBooleans({ loading: true });
-      setObjects((current) => ({ ...current, error: null }));
+    try {
+      const [recommendedList, mineList, balance] = await Promise.all([
+        fetchRecommendedChampionships(token),
+        fetchMyChampionships(token),
+        fetchMyTokenBalance(token),
+      ]);
 
-      try {
-        const [recommendedList, mineList] = await Promise.all([
-          fetchRecommendedChampionships(token),
-          fetchMyChampionships(token),
-        ]);
-
-        if (!cancelled) {
-          setObjects({
-            recommended: recommendedList,
-            mine: mineList,
-            error: null,
-          });
-        }
-      } catch (err) {
-        if (!cancelled) {
-          setObjects((current) => ({
-            ...current,
-            error:
-              err instanceof ApiError
-                ? err.message
-                : 'Não foi possível carregar os campeonatos.',
-          }));
-        }
-      } finally {
-        if (!cancelled) {
-          setBooleans({ loading: false });
-        }
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
+      setObjects({
+        recommended: recommendedList,
+        mine: mineList,
+        tokenBalance: balance,
+        error: null,
+      });
+    } catch (err) {
+      setObjects((current) => ({
+        ...current,
+        error:
+          err instanceof ApiError
+            ? err.message
+            : 'Não foi possível carregar os campeonatos.',
+      }));
+    } finally {
+      setBooleans({ loading: false });
+    }
   }, [token]);
+
+  useFocusEffect(
+    useCallback(() => {
+      void loadHome();
+    }, [loadHome]),
+  );
 
   const mineSectionTop = useMemo(() => {
     return RECOMMENDED_LIST_TOP + blockHeight(recommended.length) + SECTION_GAP;
@@ -110,12 +114,40 @@ export default function HomeScreen() {
   }, [mine.length, mineListTop]);
 
   function handleCreatePress() {
-    Alert.alert('Em breve', 'A criação de campeonatos estará disponível em breve.');
+    router.push(championshipRoutes.create as never);
+  }
+
+  function handleBuyTokensPress() {
+    router.push(championshipRoutes.buyTokens as never);
   }
 
   return (
     <ProtectedCanvas active="Início" scroll canvasHeight={canvasHeight}>
       <MatchUpLogoHeader />
+
+      <SectionLabel top={TOKENS_SECTION_TOP}>Tokens</SectionLabel>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Comprar tokens"
+        onPress={handleBuyTokensPress}
+        style={({ pressed }) => [
+          styles.tokensCard,
+          { top: TOKENS_CARD_TOP },
+          pressed && styles.tokensCardPressed,
+        ]}
+      >
+        <View style={styles.tokensIcon}>
+          <Ionicons name="ticket-outline" size={22} color={theme.colors.black} />
+        </View>
+        <View style={styles.tokensText}>
+          <Text style={styles.tokensTitle}>Comprar tokens</Text>
+          <Text style={styles.tokensMeta}>
+            Saldo: {tokenBalance} token{tokenBalance === 1 ? '' : 's'}
+          </Text>
+        </View>
+        <Ionicons name="chevron-forward" size={18} color={theme.colors.primarySoft} />
+      </Pressable>
+
       <SectionLabel top={RECOMMENDED_SECTION_TOP}>Campeonatos Recomendados</SectionLabel>
 
       {loading ? (
@@ -146,7 +178,12 @@ export default function HomeScreen() {
               year={championshipYear(championship.startsAt, championship.endsAt)}
               dates={formatChampionshipDates(championship.startsAt, championship.endsAt)}
               teams={teamsCountLabel(championship.teamsCount)}
-              actionLabel="Solicitar inscrição"
+              actionLabel={
+                championship.isPublic ? 'Solicitar inscrição' : 'Ver detalhes'
+              }
+              onPress={() =>
+                router.push(championshipRoutes.detail(championship.id) as never)
+              }
             />
           ))
         : null}
@@ -173,6 +210,10 @@ export default function HomeScreen() {
               year={championshipYear(championship.startsAt, championship.endsAt)}
               dates={formatChampionshipDates(championship.startsAt, championship.endsAt)}
               teams={teamsCountLabel(championship.teamsCount)}
+              actionLabel="Gerenciar"
+              onPress={() =>
+                router.push(championshipRoutes.detail(championship.id) as never)
+              }
             />
           ))
         : null}
@@ -181,6 +222,45 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
+  tokensCard: {
+    position: 'absolute',
+    left: 24,
+    width: 342,
+    height: TOKENS_CARD_HEIGHT,
+    borderRadius: 16,
+    backgroundColor: theme.colors.surfaceCard,
+    borderWidth: 1,
+    borderColor: theme.colors.borderStrong,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    gap: 12,
+  },
+  tokensCardPressed: {
+    opacity: 0.88,
+  },
+  tokensIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: theme.colors.primary,
+  },
+  tokensText: {
+    flex: 1,
+    gap: 2,
+  },
+  tokensTitle: {
+    color: theme.colors.text,
+    fontSize: 15,
+    fontWeight: theme.fontWeights.bold,
+  },
+  tokensMeta: {
+    color: theme.colors.textMuted,
+    fontSize: 12,
+    fontWeight: theme.fontWeights.semibold,
+  },
   loadingBox: {
     position: 'absolute',
     left: 24,

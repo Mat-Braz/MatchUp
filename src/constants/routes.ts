@@ -11,6 +11,7 @@ export const routeGroups = {
 export const mainTabs = [
   { key: 'home', label: 'Inicio' },
   { key: 'explore', label: 'Explorar' },
+  { key: 'teams', label: 'Times' },
   { key: 'contacts', label: 'Conversas' },
   { key: 'notifications', label: 'Avisos' },
   { key: 'profile', label: 'Perfil' },

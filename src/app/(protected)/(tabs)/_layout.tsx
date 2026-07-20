@@ -22,6 +22,7 @@ export default function MainTabsLayout() {
     >
       <Tabs.Screen name="home" options={{ title: 'Inicio' }} />
       <Tabs.Screen name="explore" options={{ title: 'Explorar' }} />
+      <Tabs.Screen name="teams" options={{ title: 'Times' }} />
       <Tabs.Screen name="contacts" options={{ title: 'Contatos' }} />
       <Tabs.Screen name="notifications" options={{ title: 'Avisos' }} />
       <Tabs.Screen name="profile" options={{ title: 'Perfil' }} />

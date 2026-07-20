@@ -140,6 +140,7 @@ export default function VerifyCodeScreen() {
         email: draft.email,
         name: draft.name,
         password: draft.password,
+        cpf: onlyDigits(draft.cpf),
         birthDate: `${birthDate}T12:00:00.000Z`,
         phone: draft.phone,
         cep: draft.cep,
@@ -158,7 +159,11 @@ export default function VerifyCodeScreen() {
               ? 'Código inválido ou expirado.'
               : err.message === 'Email already registered'
                 ? 'Este e-mail já está cadastrado.'
-                : err.message
+                : err.message === 'CPF already registered'
+                  ? 'Este CPF já está cadastrado.'
+                  : err.message === 'Invalid CPF'
+                    ? 'CPF inválido.'
+                    : err.message
             : 'Não foi possível verificar o código.',
       }));
     }

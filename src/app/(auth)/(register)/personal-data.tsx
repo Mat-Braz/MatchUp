@@ -15,7 +15,14 @@ import {
   useRegister,
 } from '@/features/auth';
 import { lookupCep } from '@/lib/api/viacep';
-import { formatBirthDate, formatCep, formatPhone, onlyDigits } from '@/lib/masks';
+import {
+  formatBirthDate,
+  formatCep,
+  formatCpf,
+  formatPhone,
+  isValidCpf,
+  onlyDigits,
+} from '@/lib/masks';
 
 export default function PersonalDataScreen() {
   const router = useRouter();
@@ -24,6 +31,7 @@ export default function PersonalDataScreen() {
 
   const [objects, setObjects] = useState({
     formValues: {
+      cpf: draft.cpf,
       birthDate: draft.birthDate,
       phone: draft.phone,
       cep: draft.cep,
@@ -40,6 +48,7 @@ export default function PersonalDataScreen() {
   const { lookingUpCep } = booleans;
 
   const canContinue =
+    isValidCpf(formValues.cpf) &&
     onlyDigits(formValues.birthDate).length === 8 &&
     onlyDigits(formValues.phone).length >= 10 &&
     onlyDigits(formValues.cep).length === 8 &&
@@ -52,6 +61,10 @@ export default function PersonalDataScreen() {
       error: null,
       formValues: { ...current.formValues, [field]: value },
     }));
+  }
+
+  function handleCpfChange(value: string) {
+    updateFormValue('cpf', formatCpf(value));
   }
 
   function handleBirthDateChange(value: string) {
@@ -115,12 +128,15 @@ export default function PersonalDataScreen() {
     if (!canContinue) {
       setObjects((current) => ({
         ...current,
-        error: 'Preencha todos os campos para continuar.',
+        error: !isValidCpf(formValues.cpf)
+          ? 'Informe um CPF válido.'
+          : 'Preencha todos os campos para continuar.',
       }));
       return;
     }
 
     setPersonalData({
+      cpf: onlyDigits(formValues.cpf),
       birthDate: formValues.birthDate,
       phone: formValues.phone,
       cep: formValues.cep,
@@ -138,9 +154,17 @@ export default function PersonalDataScreen() {
       />
       <Progress current={3} />
       <PencilField
+        label="CPF"
+        placeholder="000.000.000-00"
+        top={192}
+        keyboardType="number-pad"
+        value={formValues.cpf}
+        onChangeText={handleCpfChange}
+      />
+      <PencilField
         label="DATA DE NASCIMENTO"
         placeholder="00/00/0000"
-        top={192}
+        top={286}
         keyboardType="number-pad"
         value={formValues.birthDate}
         onChangeText={handleBirthDateChange}
@@ -148,7 +172,7 @@ export default function PersonalDataScreen() {
       <PencilField
         label="TELEFONE"
         placeholder="(00) 00000-0000"
-        top={286}
+        top={380}
         keyboardType="phone-pad"
         value={formValues.phone}
         onChangeText={handlePhoneChange}
@@ -156,7 +180,7 @@ export default function PersonalDataScreen() {
       <PencilField
         label="CEP"
         placeholder="00000-000"
-        top={380}
+        top={474}
         keyboardType="number-pad"
         value={formValues.cep}
         onChangeText={handleCepChange}
@@ -165,7 +189,7 @@ export default function PersonalDataScreen() {
       <PencilField
         label="CIDADE"
         placeholder={lookingUpCep ? 'Buscando...' : 'Sua cidade'}
-        top={474}
+        top={568}
         value={formValues.city}
         onChangeText={(city) => updateFormValue('city', city)}
         editable={!lookingUpCep}
@@ -173,7 +197,7 @@ export default function PersonalDataScreen() {
       <PencilField
         label="ESTADO"
         placeholder="UF"
-        top={568}
+        top={662}
         autoCapitalize="characters"
         value={formValues.uf}
         onChangeText={(uf) => updateFormValue('uf', uf.toUpperCase().slice(0, 2))}
@@ -182,11 +206,11 @@ export default function PersonalDataScreen() {
       {error ? <Text style={styles.error}>{error}</Text> : null}
       <PencilButton
         label="Criar conta"
-        top={683}
+        top={780}
         disabled={!canContinue || lookingUpCep}
         onPress={handleCreateAccount}
       />
-      <HomeIndicator top={829} />
+      <HomeIndicator top={920} />
     </PencilScreen>
   );
 }
@@ -195,7 +219,7 @@ const styles = StyleSheet.create({
   error: {
     position: 'absolute',
     left: 24,
-    top: 650,
+    top: 750,
     width: 342,
     color: theme.colors.dangerSoft,
     fontSize: 13,
