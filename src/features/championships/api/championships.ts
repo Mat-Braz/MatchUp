@@ -79,6 +79,7 @@ export type TeamSearchItem = {
   id: number;
   name: string;
   sigla: string | null;
+  shieldUrl: string | null;
   createdByUserId: number;
 };
 
@@ -196,6 +197,7 @@ const SEARCH_TEAMS_QUERY = `
       id
       name
       sigla
+      shieldUrl
       createdByUserId
     }
   }

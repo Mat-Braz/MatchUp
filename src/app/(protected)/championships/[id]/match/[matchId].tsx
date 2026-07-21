@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -44,6 +44,8 @@ const PENALTY_EVENTS = [
   { type: 'PENALTI_GOL', label: 'Convertido' },
   { type: 'PENALTI_PERDIDO', label: 'Perdido' },
 ] as const;
+
+const MATCH_POLL_MS = 4000;
 
 export default function MatchScreen() {
   const router = useRouter();
@@ -95,14 +97,23 @@ export default function MatchScreen() {
     return [];
   }, [awayMembers, homeMembers, match, selectedTeamId]);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (options?: { silent?: boolean }) => {
     if (!token || !Number.isFinite(matchId)) {
       setLoading(false);
       return;
     }
-    setLoading(true);
-    setError(null);
+    const silent = options?.silent === true;
+    if (!silent) {
+      setLoading(true);
+      setError(null);
+    }
     try {
+      if (silent) {
+        const detail = await fetchMatchDetail(token, matchId);
+        setMatch(detail);
+        return;
+      }
+
       const [detail, me] = await Promise.all([
         fetchMatchDetail(token, matchId),
         fetchMe(token),
@@ -121,16 +132,33 @@ export default function MatchScreen() {
       ]);
       setHomeMembers(home);
       setAwayMembers(away);
+      setError(null);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Falha ao carregar partida.');
+      if (!silent) {
+        setError(err instanceof ApiError ? err.message : 'Falha ao carregar partida.');
+      }
     } finally {
-      setLoading(false);
+      if (!silent) {
+        setLoading(false);
+      }
     }
   }, [matchId, token]);
+
+  const isOrganizerRef = useRef(isOrganizer);
+  isOrganizerRef.current = isOrganizer;
 
   useFocusEffect(
     useCallback(() => {
       void load();
+
+      const intervalId = setInterval(() => {
+        if (isOrganizerRef.current) {
+          return;
+        }
+        void load({ silent: true });
+      }, MATCH_POLL_MS);
+
+      return () => clearInterval(intervalId);
     }, [load]),
   );
 
@@ -157,7 +185,10 @@ export default function MatchScreen() {
     const needsPlayer =
       eventType === 'GOL' ||
       eventType === 'PENALTI_GOL' ||
-      eventType === 'PENALTI_PERDIDO';
+      eventType === 'PENALTI_PERDIDO' ||
+      eventType === 'CARTAO_AMARELO' ||
+      eventType === 'CARTAO_VERMELHO' ||
+      eventType === 'FALTA';
     if (needsPlayer && selectedPlayerId == null) {
       setError('Selecione o jogador responsável.');
       return;
@@ -261,7 +292,7 @@ export default function MatchScreen() {
                   )}
                 </View>
 
-                <Text style={styles.hint}>Jogador</Text>
+                <Text style={styles.hint}>Jogador (obrigatório para gols, cartões e faltas)</Text>
                 <View style={styles.rowWrap}>
                   {membersForSelected.map((member) => (
                     <Pressable

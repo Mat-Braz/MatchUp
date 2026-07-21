@@ -518,9 +518,13 @@ function ConvitesPanel({
         return (
           <View key={user.id} style={styles.userRow}>
             <View style={styles.avatar}>
-              <Text style={styles.avatarText}>
-                {user.name.slice(0, 1).toUpperCase()}
-              </Text>
+              {user.avatarUrl ? (
+                <Image source={{ uri: user.avatarUrl }} style={styles.avatarImage} />
+              ) : (
+                <Text style={styles.avatarText}>
+                  {user.name.slice(0, 1).toUpperCase()}
+                </Text>
+              )}
             </View>
             <View style={{ flex: 1 }}>
               <Text style={styles.userName}>{user.name}</Text>
@@ -958,6 +962,11 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.surfaceHigh,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  avatarImage: {
+    width: '100%',
+    height: '100%',
   },
   avatarText: {
     color: theme.colors.primarySoft,

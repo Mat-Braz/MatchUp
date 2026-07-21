@@ -23,6 +23,7 @@ import {
   teamsCountLabel,
   type Championship,
 } from '@/features/championships';
+import { fetchMe } from '@/features/profile';
 import { fetchMyTokenBalance } from '@/features/tokens';
 import { ApiError } from '@/lib/api/graphql';
 
@@ -52,13 +53,14 @@ export default function HomeScreen() {
     recommended: [] as Championship[],
     mine: [] as Championship[],
     tokenBalance: 0,
+    userId: null as number | null,
     error: null as string | null,
   });
   const [booleans, setBooleans] = useState({
     loading: true,
   });
 
-  const { recommended, mine, tokenBalance, error } = objects;
+  const { recommended, mine, tokenBalance, userId, error } = objects;
   const { loading } = booleans;
 
   const loadHome = useCallback(async () => {
@@ -71,16 +73,18 @@ export default function HomeScreen() {
     setObjects((current) => ({ ...current, error: null }));
 
     try {
-      const [recommendedList, mineList, balance] = await Promise.all([
+      const [recommendedList, mineList, balance, me] = await Promise.all([
         fetchRecommendedChampionships(token),
         fetchMyChampionships(token),
         fetchMyTokenBalance(token),
+        fetchMe(token),
       ]);
 
       setObjects({
         recommended: recommendedList,
         mine: mineList,
         tokenBalance: balance,
+        userId: me.id,
         error: null,
       });
     } catch (err) {
@@ -195,7 +199,7 @@ export default function HomeScreen() {
       {!loading && !error && mine.length === 0 ? (
         <EmptyState
           top={mineListTop}
-          title="Você ainda não criou nada"
+          title="Nenhum campeonato seu"
           message="Seus campeonatos criados ou participações ficarão nesta área."
         />
       ) : null}
@@ -210,7 +214,11 @@ export default function HomeScreen() {
               year={championshipYear(championship.startsAt, championship.endsAt)}
               dates={formatChampionshipDates(championship.startsAt, championship.endsAt)}
               teams={teamsCountLabel(championship.teamsCount)}
-              actionLabel="Gerenciar"
+              actionLabel={
+                userId != null && championship.responsibleUserId === userId
+                  ? 'Gerenciar'
+                  : 'Ver detalhes'
+              }
               onPress={() =>
                 router.push(championshipRoutes.detail(championship.id) as never)
               }

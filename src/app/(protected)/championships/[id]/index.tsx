@@ -2,6 +2,7 @@ import { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Image,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -395,6 +396,15 @@ export default function ChampionshipDetailScreen() {
                 </View>
                 {inviteResults.map((team) => (
                   <View key={team.id} style={styles.listRow}>
+                    <View style={styles.avatar}>
+                      {team.shieldUrl ? (
+                        <Image source={{ uri: team.shieldUrl }} style={styles.avatarImage} />
+                      ) : (
+                        <Text style={styles.avatarText}>
+                          {(team.sigla ?? team.name).slice(0, 1).toUpperCase()}
+                        </Text>
+                      )}
+                    </View>
                     <Text style={styles.listName}>{team.name}</Text>
                     <Pressable
                       disabled={acting}
@@ -680,6 +690,23 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderBottomWidth: 1,
     borderBottomColor: theme.colors.border,
+  },
+  avatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: theme.colors.surfaceHigh,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  avatarImage: {
+    width: '100%',
+    height: '100%',
+  },
+  avatarText: {
+    color: theme.colors.primarySoft,
+    fontWeight: theme.fontWeights.bold,
   },
   listName: {
     flex: 1,
