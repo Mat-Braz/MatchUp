@@ -18,8 +18,9 @@ import { TeamShield } from './TeamShield';
 
 const BASE_SHIELD = 44;
 const BASE_CONNECTOR = 28;
-const BASE_MATCH_GAP = 22;
-const ZOOM_MIN = 0.4;
+const BASE_MATCH_GAP = 28;
+const MIN_SHIELD = 34;
+const ZOOM_MIN = 0.55;
 const ZOOM_MAX = 1.4;
 const ZOOM_STEP = 0.1;
 
@@ -174,24 +175,64 @@ function buildFullSlots(
   return result;
 }
 
+/** Tamanhos derivados do zoom — sempre coerentes entre layout e render. */
+function shieldSize(zoom: number): number {
+  return Math.max(MIN_SHIELD, Math.round(BASE_SHIELD * zoom));
+}
+
+function teamNodeWidth(zoom: number): number {
+  return shieldSize(zoom) + Math.max(8, Math.round(10 * zoom));
+}
+
+function connectorWidth(zoom: number): number {
+  return Math.max(20, Math.round(BASE_CONNECTOR * zoom));
+}
+
+function matchGap(zoom: number): number {
+  // Nunca menor que ~40% do escudo, para não empilhar confrontos
+  return Math.max(
+    Math.round(shieldSize(zoom) * 0.45),
+    Math.round(BASE_MATCH_GAP * zoom),
+  );
+}
+
 function matchWidth(zoom: number): number {
-  const shield = BASE_SHIELD * zoom;
-  return (shield + 8 * zoom) * 2 + BASE_CONNECTOR * zoom;
+  return teamNodeWidth(zoom) * 2 + connectorWidth(zoom);
 }
 
 function rowWidth(slotCount: number, zoom: number): number {
   if (slotCount <= 0) {
-    return 200 * zoom;
+    return 200;
   }
-  const gap = BASE_MATCH_GAP * zoom;
-  return slotCount * matchWidth(zoom) + (slotCount - 1) * gap;
+  return slotCount * matchWidth(zoom) + (slotCount - 1) * matchGap(zoom);
 }
 
+/**
+ * Zoom inicial: tenta caber na tela, mas não esmaga a chave.
+ * Com 16+ times prioriza scroll horizontal em vez de sobrepor.
+ */
 function defaultZoomForBracket(bracketSize: number, viewportWidth: number): number {
   const firstRoundMatches = Math.max(1, bracketSize / 2);
-  const needed = rowWidth(firstRoundMatches, 1) + 48;
-  const fit = viewportWidth / needed;
-  return Math.min(1, Math.max(ZOOM_MIN, Math.round(fit * 100) / 100));
+  // Zoom mínimo em que a 1ª rodada ainda respeita MIN_SHIELD + gaps
+  const minReadable = MIN_SHIELD / BASE_SHIELD; // ~0.77
+
+  let candidate = 1;
+  for (let z = 1; z >= minReadable - 0.01; z = Math.round((z - 0.05) * 100) / 100) {
+    if (rowWidth(firstRoundMatches, z) + 40 <= viewportWidth) {
+      candidate = z;
+      break;
+    }
+    candidate = z;
+  }
+
+  // Em chaves grandes, não força caber tudo: mantém legível e deixa rolar
+  if (bracketSize >= 16) {
+    return Math.max(minReadable, Math.min(0.95, candidate));
+  }
+  if (bracketSize >= 8) {
+    return Math.max(minReadable, Math.min(1, candidate));
+  }
+  return Math.min(1, Math.max(ZOOM_MIN, candidate));
 }
 
 function TeamNode({
@@ -205,18 +246,22 @@ function TeamNode({
   caption?: string | null;
   zoom: number;
 }) {
-  const shield = Math.max(28, Math.round(BASE_SHIELD * zoom));
+  const shield = shieldSize(zoom);
+  const nodeWidth = teamNodeWidth(zoom);
   const label =
     caption ??
     (team ? (team.sigla ?? team.name).slice(0, 3).toUpperCase() : '—');
 
   return (
-    <View style={[styles.teamNode, { width: shield + 8 * zoom }]}>
+    <View style={[styles.teamNode, { width: nodeWidth }]}>
       <View style={styles.shieldWrap}>
         <TeamShield team={team} size={shield} />
         {isWinner ? <View style={styles.winnerDot} /> : null}
       </View>
-      <Text style={[styles.teamSigla, { fontSize: Math.max(8, 10 * zoom) }]} numberOfLines={1}>
+      <Text
+        style={[styles.teamSigla, { fontSize: Math.max(8, Math.round(10 * zoom)) }]}
+        numberOfLines={1}
+      >
         {label}
       </Text>
     </View>
@@ -224,10 +269,11 @@ function TeamNode({
 }
 
 function MatchNode({ slot, zoom }: { slot: BracketSlot; zoom: number }) {
-  const connector = Math.max(18, BASE_CONNECTOR * zoom);
+  const width = matchWidth(zoom);
+  const connector = connectorWidth(zoom);
 
   return (
-    <View style={[styles.matchNode, { width: matchWidth(zoom) }]}>
+    <View style={[styles.matchNode, { width, minWidth: width }]}>
       <TeamNode
         team={slot.homeTeam}
         zoom={zoom}
@@ -255,22 +301,15 @@ function MatchNode({ slot, zoom }: { slot: BracketSlot; zoom: number }) {
 function MatchesRow({
   slots,
   zoom,
-  width,
 }: {
   slots: BracketSlot[];
   zoom: number;
-  width: number;
 }) {
+  const width = rowWidth(slots.length, zoom);
+  const gap = matchGap(zoom);
+
   return (
-    <View
-      style={[
-        styles.matchesRow,
-        {
-          width,
-          gap: BASE_MATCH_GAP * zoom,
-        },
-      ]}
-    >
+    <View style={[styles.matchesRow, { width, minWidth: width, gap }]}>
       {slots.map((slot) => (
         <MatchNode key={slot.key} slot={slot} zoom={zoom} />
       ))}
@@ -513,21 +552,14 @@ export function BracketTreeModal({
                   <FinalMatch slot={finalSlot} zoom={zoom} />
 
                   {/* Demais fases: sobe da 1ª rodada (embaixo) até a final */}
-                  {roundsFromTop.map((row) => {
-                    const width = rowWidth(row.slots.length, zoom);
-                    return (
+                  {roundsFromTop.map((row) => (
                       <View key={row.round} style={styles.roundBlock}>
                         <View style={styles.upStem} />
                         <RoundLabel label={row.label} width={contentWidth - 24} />
                         <View style={styles.upStem} />
-                        <MatchesRow
-                          slots={row.slots}
-                          zoom={zoom}
-                          width={width}
-                        />
+                        <MatchesRow slots={row.slots} zoom={zoom} />
                       </View>
-                    );
-                  })}
+                    ))}
                 </View>
               </ScrollView>
             </ScrollView>
@@ -644,20 +676,23 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'nowrap',
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'flex-start',
     alignSelf: 'center',
     paddingVertical: 10,
+    overflow: 'visible',
   },
   matchNode: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'space-between',
     flexShrink: 0,
+    flexGrow: 0,
   },
   teamNode: {
     alignItems: 'center',
     gap: 4,
     flexShrink: 0,
+    flexGrow: 0,
   },
   shieldWrap: {
     position: 'relative',
@@ -682,6 +717,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     flexShrink: 0,
+    flexGrow: 0,
   },
   connectorLine: {
     flex: 1,
