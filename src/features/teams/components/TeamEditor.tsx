@@ -25,6 +25,7 @@ import { ApiError } from '@/lib/api/graphql';
 
 import {
   createTeam,
+  fetchPendingTeamInvitePlayerIds,
   fetchTeam,
   fetchTeamMembers,
   invitePlayerToTeam,
@@ -393,6 +394,35 @@ function ConvitesPanel({
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [ensuring, setEnsuring] = useState(false);
+  const [pendingPlayerIds, setPendingPlayerIds] = useState<number[]>([]);
+
+  useEffect(() => {
+    if (!token || !draft.teamId || !canEdit) {
+      setPendingPlayerIds([]);
+      return;
+    }
+
+    let cancelled = false;
+    void (async () => {
+      try {
+        const ids = await fetchPendingTeamInvitePlayerIds(token, draft.teamId!);
+        if (!cancelled) {
+          setPendingPlayerIds(ids);
+          updateDraft({
+            invitedPlayerIds: [...new Set([...draft.invitedPlayerIds, ...ids])],
+          });
+        }
+      } catch {
+        // Ignore pending invite load failures in the invites panel.
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+    // Only reload when team changes / panel mounts.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canEdit, draft.teamId, token]);
 
   const runSearch = useCallback(async () => {
     if (!canEdit || !token || query.trim().length < 2) {
@@ -442,7 +472,13 @@ function ConvitesPanel({
   }
 
   async function handleInvite(player: UserSearchItem) {
-    if (!canEdit || !token || invitingId) {
+    if (
+      !canEdit ||
+      !token ||
+      invitingId ||
+      pendingPlayerIds.includes(player.id) ||
+      draft.invitedPlayerIds.includes(player.id)
+    ) {
       return;
     }
     setInvitingId(player.id);
@@ -454,6 +490,9 @@ function ConvitesPanel({
         return;
       }
       await invitePlayerToTeam(token, teamId, player.id);
+      setPendingPlayerIds((current) =>
+        current.includes(player.id) ? current : [...current, player.id],
+      );
       updateDraft({
         invitedPlayerIds: [...new Set([...draft.invitedPlayerIds, player.id])],
       });
@@ -514,7 +553,9 @@ function ConvitesPanel({
       {ensuring ? <ActivityIndicator color={theme.colors.primary} /> : null}
 
       {results.map((user) => {
-        const invited = draft.invitedPlayerIds.includes(user.id);
+        const invited =
+          pendingPlayerIds.includes(user.id) ||
+          draft.invitedPlayerIds.includes(user.id);
         return (
           <View key={user.id} style={styles.userRow}>
             <View style={styles.avatar}>
@@ -536,7 +577,11 @@ function ConvitesPanel({
               style={[styles.inviteBtn, invited && styles.inviteBtnDone]}
             >
               <Text style={[styles.inviteText, invited && styles.inviteTextDone]}>
-                {invited ? 'Enviado' : invitingId === user.id ? '...' : 'Convidar'}
+                {invited
+                  ? 'Convite enviado'
+                  : invitingId === user.id
+                    ? '...'
+                    : 'Convidar'}
               </Text>
             </Pressable>
           </View>

@@ -4,6 +4,23 @@ import { ActivityIndicator, View } from 'react-native';
 import { authRoutes } from '@/constants/authRoutes';
 import { theme } from '@/constants/theme';
 import { useAuth } from '@/features/auth';
+import {
+  NotificationBadgeProvider,
+  usePushNotifications,
+} from '@/features/notifications';
+
+function ProtectedShell() {
+  usePushNotifications();
+
+  return (
+    <Stack
+      screenOptions={{
+        contentStyle: { backgroundColor: theme.colors.background },
+        headerShown: false,
+      }}
+    />
+  );
+}
 
 export default function ProtectedLayout() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -21,11 +38,8 @@ export default function ProtectedLayout() {
   }
 
   return (
-    <Stack
-      screenOptions={{
-        contentStyle: { backgroundColor: theme.colors.background },
-        headerShown: false,
-      }}
-    />
+    <NotificationBadgeProvider>
+      <ProtectedShell />
+    </NotificationBadgeProvider>
   );
 }

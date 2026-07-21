@@ -5,8 +5,10 @@ export {
   createChampionship,
   fetchChampionship,
   fetchChampionshipTeams,
+  fetchExplorePublicChampionships,
   fetchMyChampionships,
   fetchMyProfileChampionships,
+  fetchMyProfileChampionshipsPage,
   fetchRecommendedChampionships,
   formatChampionshipDates,
   formatMyChampionshipSubtitle,
@@ -16,6 +18,8 @@ export {
   searchTeams,
   teamsCountLabel,
   updateChampionship,
+  fetchPendingChampionshipInviteTeamIds,
+  fetchPendingChampionshipJoinTeamIds,
 } from './api/championships';
 export type {
   Championship,
@@ -24,9 +28,13 @@ export type {
   ChampionshipTeamItem,
   ChampionshipType,
   CreateChampionshipInput,
+  ExploreChampionshipsInput,
+  ExploreChampionshipsResult,
   MyChampionshipItem,
   MyChampionshipRelation,
   MyChampionshipsScope,
+  MyProfileChampionshipsPageInput,
+  MyProfileChampionshipsPageResult,
   TeamSearchItem,
   UpdateChampionshipInput,
 } from './api/championships';
@@ -37,9 +45,13 @@ export {
   fetchChampionshipBracket,
   fetchChampionshipStandings,
   fetchMatchDetail,
+  fetchMatchTeamSquads,
+  formatSubstitutionLabel,
   matchStatusLabel,
+  parseSubstitutionPlayerOut,
   rejectMatchResult,
   removeMatchEvent,
+  resolveChampionshipChampion,
   startChampionship,
   startMatch,
   startPenalties,
@@ -53,7 +65,9 @@ export type {
   MatchDetail,
   MatchEvent,
   MatchPhase,
+  MatchSquadPlayer,
   MatchStatus,
+  MatchTeamSquad,
   StandingRow,
 } from './api/tournament';
 export {
@@ -61,3 +75,10 @@ export {
   useChampionshipWizard,
 } from './context/ChampionshipWizardContext';
 export type { ChampionshipDraft } from './context/ChampionshipWizardContext';
+export {
+  ExploreFilterModal,
+  type ExploreAdvancedFilters,
+} from './components/ExploreFilterModal';
+export { BracketTreeModal } from './components/BracketTreeModal';
+export { TeamShield } from './components/TeamShield';
+export { SubstitutionModal } from './components/SubstitutionModal';

@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Ionicons } from '@expo/vector-icons';
@@ -63,13 +63,15 @@ export default function HomeScreen() {
   const { recommended, mine, tokenBalance, userId, error } = objects;
   const { loading } = booleans;
 
-  const loadHome = useCallback(async () => {
+  const loadHome = useCallback(async (opts?: { silent?: boolean }) => {
     if (!token) {
       setBooleans({ loading: false });
       return;
     }
 
-    setBooleans({ loading: true });
+    if (!opts?.silent) {
+      setBooleans({ loading: true });
+    }
     setObjects((current) => ({ ...current, error: null }));
 
     try {
@@ -96,7 +98,9 @@ export default function HomeScreen() {
             : 'Não foi possível carregar os campeonatos.',
       }));
     } finally {
-      setBooleans({ loading: false });
+      if (!opts?.silent) {
+        setBooleans({ loading: false });
+      }
     }
   }, [token]);
 
@@ -105,6 +109,13 @@ export default function HomeScreen() {
       void loadHome();
     }, [loadHome]),
   );
+
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      void loadHome({ silent: true });
+    }, 60_000);
+    return () => clearInterval(intervalId);
+  }, [loadHome]);
 
   const mineSectionTop = useMemo(() => {
     return RECOMMENDED_LIST_TOP + blockHeight(recommended.length) + SECTION_GAP;

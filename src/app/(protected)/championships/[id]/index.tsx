@@ -19,6 +19,7 @@ import { championshipRoutes } from '@/constants/championshipRoutes';
 import { theme } from '@/constants/theme';
 import { useAuth } from '@/features/auth';
 import {
+  BracketTreeModal,
   championshipStatusLabel,
   fetchChampionship,
   fetchChampionshipBracket,
@@ -29,9 +30,12 @@ import {
   matchStatusLabel,
   removeChampionship,
   requestJoinChampionship,
+  resolveChampionshipChampion,
   searchTeams,
   startChampionship,
   teamsCountLabel,
+  fetchPendingChampionshipInviteTeamIds,
+  fetchPendingChampionshipJoinTeamIds,
   type BracketGame,
   type ChampionshipDetails,
   type ChampionshipTeamItem,
@@ -63,6 +67,9 @@ export default function ChampionshipDetailScreen() {
   const [inviteQuery, setInviteQuery] = useState('');
   const [inviteResults, setInviteResults] = useState<TeamSearchItem[]>([]);
   const [searching, setSearching] = useState(false);
+  const [pendingJoinTeamIds, setPendingJoinTeamIds] = useState<number[]>([]);
+  const [pendingInviteTeamIds, setPendingInviteTeamIds] = useState<number[]>([]);
+  const [bracketModalVisible, setBracketModalVisible] = useState(false);
 
   const isOrganizer = useMemo(
     () =>
@@ -118,15 +125,20 @@ export default function ChampionshipDetailScreen() {
       setUserId(me.id);
       setMyTeams(owned);
 
+      const [pendingJoin, pendingInvite] = await Promise.all([
+        fetchPendingChampionshipJoinTeamIds(token, championshipId),
+        fetchPendingChampionshipInviteTeamIds(token, championshipId),
+      ]);
+      setPendingJoinTeamIds(pendingJoin);
+      setPendingInviteTeamIds(pendingInvite);
+
       if (
         detail.status === 'EM_ANDAMENTO' ||
         detail.status === 'ENCERRADO'
       ) {
         const [games, table] = await Promise.all([
           fetchChampionshipBracket(token, championshipId),
-          detail.championshipType === 'PONTOS_CORRIDOS'
-            ? fetchChampionshipStandings(token, championshipId)
-            : Promise.resolve([]),
+          fetchChampionshipStandings(token, championshipId),
         ]);
         setBracket(games);
         setStandings(table);
@@ -170,7 +182,7 @@ export default function ChampionshipDetailScreen() {
   }
 
   async function handleInvite(teamId: number) {
-    if (!token || acting) {
+    if (!token || acting || pendingInviteTeamIds.includes(teamId)) {
       return;
     }
     setActing(true);
@@ -178,8 +190,10 @@ export default function ChampionshipDetailScreen() {
     setError(null);
     try {
       await inviteTeamToChampionship(token, championshipId, teamId);
+      setPendingInviteTeamIds((current) =>
+        current.includes(teamId) ? current : [...current, teamId],
+      );
       setMessage('Convite enviado para o criador do time.');
-      setInviteResults((current) => current.filter((item) => item.id !== teamId));
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Falha ao convidar time.');
     } finally {
@@ -188,7 +202,7 @@ export default function ChampionshipDetailScreen() {
   }
 
   async function handleRequestJoin(teamId: number) {
-    if (!token || acting) {
+    if (!token || acting || pendingJoinTeamIds.includes(teamId)) {
       return;
     }
     setActing(true);
@@ -196,6 +210,9 @@ export default function ChampionshipDetailScreen() {
     setError(null);
     try {
       await requestJoinChampionship(token, championshipId, teamId);
+      setPendingJoinTeamIds((current) =>
+        current.includes(teamId) ? current : [...current, teamId],
+      );
       setMessage('Solicitação enviada ao organizador.');
     } catch (err) {
       setError(
@@ -287,6 +304,24 @@ export default function ChampionshipDetailScreen() {
     enrollmentOpen &&
     supportsTournament &&
     teams.length >= 2;
+
+  const champion = useMemo(() => {
+    if (championship?.status !== 'ENCERRADO') {
+      return null;
+    }
+    return resolveChampionshipChampion(
+      championship.championshipType,
+      standings,
+      bracket,
+    );
+  }, [bracket, championship, standings]);
+
+  const championTeam = useMemo(() => {
+    if (!champion) {
+      return null;
+    }
+    return teams.find((team) => team.id === champion.teamId) ?? null;
+  }, [champion, teams]);
 
   return (
     <View style={[styles.root, { paddingTop: insets.top + 8 }]}>
@@ -394,7 +429,9 @@ export default function ChampionshipDetailScreen() {
                     )}
                   </Pressable>
                 </View>
-                {inviteResults.map((team) => (
+                {inviteResults.map((team) => {
+                  const pending = pendingInviteTeamIds.includes(team.id);
+                  return (
                   <View key={team.id} style={styles.listRow}>
                     <View style={styles.avatar}>
                       {team.shieldUrl ? (
@@ -407,14 +444,22 @@ export default function ChampionshipDetailScreen() {
                     </View>
                     <Text style={styles.listName}>{team.name}</Text>
                     <Pressable
-                      disabled={acting}
+                      disabled={acting || pending}
                       onPress={() => void handleInvite(team.id)}
-                      style={styles.smallPrimary}
+                      style={[styles.smallPrimary, pending && styles.smallPrimaryDone]}
                     >
-                      <Text style={styles.smallPrimaryText}>Convidar</Text>
+                      <Text
+                        style={[
+                          styles.smallPrimaryText,
+                          pending && styles.smallPrimaryTextDone,
+                        ]}
+                      >
+                        {pending ? 'Convite enviado' : 'Convidar'}
+                      </Text>
                     </Pressable>
                   </View>
-                ))}
+                  );
+                })}
               </View>
             ) : null}
 
@@ -427,18 +472,28 @@ export default function ChampionshipDetailScreen() {
                 </Text>
                 {creatableTeams
                   .filter((team) => !enrolledTeamIds.has(team.teamId))
-                  .map((team) => (
+                  .map((team) => {
+                    const pending = pendingJoinTeamIds.includes(team.teamId);
+                    return (
                     <View key={team.id} style={styles.listRow}>
                       <Text style={styles.listName}>{team.teamName}</Text>
                       <Pressable
-                        disabled={acting}
+                        disabled={acting || pending}
                         onPress={() => void handleRequestJoin(team.teamId)}
-                        style={styles.smallPrimary}
+                        style={[styles.smallPrimary, pending && styles.smallPrimaryDone]}
                       >
-                        <Text style={styles.smallPrimaryText}>Solicitar</Text>
+                        <Text
+                          style={[
+                            styles.smallPrimaryText,
+                            pending && styles.smallPrimaryTextDone,
+                          ]}
+                        >
+                          {pending ? 'Solicitação enviada' : 'Solicitar'}
+                        </Text>
                       </Pressable>
                     </View>
-                  ))}
+                    );
+                  })}
               </View>
             ) : null}
 
@@ -451,7 +506,8 @@ export default function ChampionshipDetailScreen() {
 
             {isRunning ? (
               <>
-                {standings.length > 0 ? (
+                {standings.length > 0 &&
+                championship.championshipType === 'PONTOS_CORRIDOS' ? (
                   <View style={styles.section}>
                     <Text style={styles.sectionTitle}>Classificação</Text>
                     {standings.map((row, index) => (
@@ -468,11 +524,29 @@ export default function ChampionshipDetailScreen() {
                 ) : null}
 
                 <View style={styles.section}>
-                  <Text style={styles.sectionTitle}>
-                    {championship.championshipType === 'ELIMINATORIA'
-                      ? 'Chaveamento'
-                      : 'Partidas'}
-                  </Text>
+                  <View style={styles.sectionTitleRow}>
+                    <Text style={styles.sectionTitle}>
+                      {championship.championshipType === 'ELIMINATORIA'
+                        ? 'Chaveamento'
+                        : 'Partidas'}
+                    </Text>
+                    {championship.championshipType === 'ELIMINATORIA' &&
+                    bracket.length > 0 ? (
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel="Ver chaveamento em árvore"
+                        hitSlop={10}
+                        onPress={() => setBracketModalVisible(true)}
+                        style={styles.eyeBtn}
+                      >
+                        <Ionicons
+                          name="eye-outline"
+                          size={22}
+                          color={theme.colors.primary}
+                        />
+                      </Pressable>
+                    ) : null}
+                  </View>
                   {gamesByRound.length === 0 ? (
                     <Text style={styles.sectionHint}>Nenhuma partida gerada.</Text>
                   ) : (
@@ -532,6 +606,50 @@ export default function ChampionshipDetailScreen() {
                     ))
                   )}
                 </View>
+
+                <BracketTreeModal
+                  visible={bracketModalVisible}
+                  games={bracket}
+                  maxParticipants={championship.maxParticipants}
+                  onClose={() => setBracketModalVisible(false)}
+                />
+
+                {champion ? (
+                  <View style={styles.championSection}>
+                    <Text style={styles.sectionTitle}>Campeão</Text>
+                    <View style={styles.championCard}>
+                      <View style={styles.championBadge}>
+                        <Ionicons name="trophy" size={28} color={theme.colors.black} />
+                      </View>
+                      <View style={styles.championAvatar}>
+                        {championTeam?.shieldUrl ? (
+                          <Image
+                            source={{ uri: championTeam.shieldUrl }}
+                            style={styles.avatarImage}
+                          />
+                        ) : (
+                          <Text style={styles.avatarText}>
+                            {(champion.sigla ?? champion.name).slice(0, 1).toUpperCase()}
+                          </Text>
+                        )}
+                      </View>
+                      <View style={styles.championText}>
+                        <Text style={styles.championLabel}>Campeão do campeonato</Text>
+                        <Text style={styles.championName}>{champion.name}</Text>
+                        {champion.sigla ? (
+                          <Text style={styles.championSigla}>{champion.sigla}</Text>
+                        ) : null}
+                      </View>
+                    </View>
+                  </View>
+                ) : championship.status === 'ENCERRADO' ? (
+                  <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>Campeão</Text>
+                    <Text style={styles.sectionHint}>
+                      Campeonato encerrado. Campeão ainda não identificado.
+                    </Text>
+                  </View>
+                ) : null}
               </>
             ) : (
               <View style={styles.section}>
@@ -650,10 +768,26 @@ const styles = StyleSheet.create({
     fontWeight: theme.fontWeights.bold,
   },
   section: { gap: 10 },
+  sectionTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
   sectionTitle: {
     color: theme.colors.text,
     fontSize: 16,
     fontWeight: theme.fontWeights.bold,
+  },
+  eyeBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: theme.colors.surfaceCard,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
   },
   sectionHint: {
     color: theme.colors.textMuted,
@@ -744,10 +878,18 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     backgroundColor: theme.colors.primary,
   },
+  smallPrimaryDone: {
+    backgroundColor: theme.colors.surfaceHigh,
+    borderWidth: 1,
+    borderColor: theme.colors.borderStrong,
+  },
   smallPrimaryText: {
     color: theme.colors.black,
     fontWeight: theme.fontWeights.bold,
     fontSize: 12,
+  },
+  smallPrimaryTextDone: {
+    color: theme.colors.textMuted,
   },
   ok: {
     color: theme.colors.primarySoft,
@@ -755,6 +897,59 @@ const styles = StyleSheet.create({
   },
   error: {
     color: theme.colors.dangerSoft,
+    fontSize: 13,
+    fontWeight: theme.fontWeights.semibold,
+  },
+  championSection: { gap: 10 },
+  championCard: {
+    position: 'relative',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    padding: 16,
+    borderRadius: 16,
+    backgroundColor: theme.colors.surfaceCard,
+    borderWidth: 1,
+    borderColor: theme.colors.primary,
+  },
+  championBadge: {
+    position: 'absolute',
+    top: -10,
+    right: 16,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: theme.colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  championAvatar: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: theme.colors.surfaceHigh,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  championText: {
+    flex: 1,
+    gap: 2,
+    paddingRight: 36,
+  },
+  championLabel: {
+    color: theme.colors.primarySoft,
+    fontSize: 11,
+    fontWeight: theme.fontWeights.bold,
+    textTransform: 'uppercase',
+  },
+  championName: {
+    color: theme.colors.text,
+    fontSize: 18,
+    fontWeight: theme.fontWeights.extraBold,
+  },
+  championSigla: {
+    color: theme.colors.textMuted,
     fontSize: 13,
     fontWeight: theme.fontWeights.semibold,
   },

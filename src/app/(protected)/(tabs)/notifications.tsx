@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Pressable,
   StyleSheet,
   Text,
@@ -13,12 +14,14 @@ import { ProtectedCanvas, ScreenTitle } from '@/components/layout/PencilProtecte
 import { theme } from '@/constants/theme';
 import { useAuth } from '@/features/auth';
 import {
+  clearMyNotifications,
   fetchMyNotifications,
   formatNotificationTime,
   inviteStatusLabel,
   markAllAlertsRead,
   markNotificationRead,
   respondToInvite,
+  useNotificationBadge,
   type MyNotificationItem,
   type NotificationCategory,
 } from '@/features/notifications';
@@ -28,12 +31,14 @@ type TabKey = 'ALERTS' | 'INVITES';
 
 export default function NotificationsScreen() {
   const { token } = useAuth();
+  const { refresh: refreshBadge } = useNotificationBadge();
   const [tab, setTab] = useState<TabKey>('ALERTS');
   const [items, setItems] = useState<MyNotificationItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [actingId, setActingId] = useState<number | null>(null);
   const [markingAll, setMarkingAll] = useState(false);
+  const [clearing, setClearing] = useState(false);
 
   const category: NotificationCategory =
     tab === 'INVITES' ? 'INVITES' : 'ALERTS';
@@ -47,6 +52,7 @@ export default function NotificationsScreen() {
     setError(null);
     try {
       setItems(await fetchMyNotifications(token, category));
+      await refreshBadge();
     } catch (err) {
       setError(
         err instanceof ApiError
@@ -56,7 +62,7 @@ export default function NotificationsScreen() {
     } finally {
       setLoading(false);
     }
-  }, [category, token]);
+  }, [category, refreshBadge, token]);
 
   useFocusEffect(
     useCallback(() => {
@@ -68,6 +74,13 @@ export default function NotificationsScreen() {
     () => items.filter((item) => !item.isInvite && item.isUnread).length,
     [items],
   );
+
+  const clearableCount = useMemo(() => {
+    if (tab === 'ALERTS') {
+      return items.length;
+    }
+    return items.filter((item) => item.status !== 'PENDENTE').length;
+  }, [items, tab]);
 
   const listTop = 168;
   const canvasHeight = Math.max(844, listTop + items.length * 118 + 160);
@@ -105,6 +118,7 @@ export default function NotificationsScreen() {
             : row,
         ),
       );
+      await refreshBadge();
     } catch {
       // silent — list still usable
     }
@@ -129,6 +143,50 @@ export default function NotificationsScreen() {
     }
   }
 
+  function handleClearPress() {
+    if (!token || clearing || clearableCount === 0) {
+      return;
+    }
+
+    const isAlerts = tab === 'ALERTS';
+    Alert.alert(
+      isAlerts ? 'Limpar avisos?' : 'Limpar convites?',
+      isAlerts
+        ? 'Todos os avisos serão removidos da caixa.'
+        : 'Convites já respondidos serão removidos. Os pendentes continuam aqui.',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Limpar',
+          style: 'destructive',
+          onPress: () => {
+            void handleClear();
+          },
+        },
+      ],
+    );
+  }
+
+  async function handleClear() {
+    if (!token || clearing) {
+      return;
+    }
+    setClearing(true);
+    setError(null);
+    try {
+      await clearMyNotifications(token, category);
+      await load();
+    } catch (err) {
+      setError(
+        err instanceof ApiError
+          ? err.message
+          : 'Não foi possível limpar as notificações.',
+      );
+    } finally {
+      setClearing(false);
+    }
+  }
+
   return (
     <ProtectedCanvas active="Notificações" scroll canvasHeight={canvasHeight}>
       <ScreenTitle>Notificações</ScreenTitle>
@@ -144,22 +202,38 @@ export default function NotificationsScreen() {
             Convites
           </Text>
         </Pressable>
-        {tab === 'ALERTS' ? (
+        <View style={styles.actionsRow}>
+          {tab === 'ALERTS' ? (
+            <Pressable
+              onPress={handleMarkAll}
+              disabled={markingAll || unreadAlerts === 0}
+              style={styles.headerActionBtn}
+            >
+              <Text
+                style={[
+                  styles.headerAction,
+                  (markingAll || unreadAlerts === 0) && styles.headerActionDisabled,
+                ]}
+              >
+                {markingAll ? '...' : 'Marcar todas'}
+              </Text>
+            </Pressable>
+          ) : null}
           <Pressable
-            onPress={handleMarkAll}
-            disabled={markingAll || unreadAlerts === 0}
-            style={styles.markAllBtn}
+            onPress={handleClearPress}
+            disabled={clearing || clearableCount === 0}
+            style={styles.headerActionBtn}
           >
             <Text
               style={[
-                styles.markAll,
-                (markingAll || unreadAlerts === 0) && styles.markAllDisabled,
+                styles.headerAction,
+                (clearing || clearableCount === 0) && styles.headerActionDisabled,
               ]}
             >
-              {markingAll ? '...' : 'Marcar todas'}
+              {clearing ? '...' : 'Limpar'}
             </Text>
           </Pressable>
-        ) : null}
+        </View>
       </View>
 
       {loading ? (
@@ -284,15 +358,21 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: theme.fontWeights.extraBold,
   },
-  markAllBtn: {
+  actionsRow: {
     marginLeft: 'auto',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
   },
-  markAll: {
+  headerActionBtn: {
+    paddingVertical: 2,
+  },
+  headerAction: {
     color: theme.colors.primary,
     fontSize: 14,
     fontWeight: theme.fontWeights.extraBold,
   },
-  markAllDisabled: {
+  headerActionDisabled: {
     opacity: 0.4,
   },
   center: {

@@ -13,6 +13,7 @@ export type BracketTeam = {
   id: number;
   name: string;
   sigla: string | null;
+  shieldUrl?: string | null;
   createdByUserId: number;
 };
 
@@ -100,9 +101,24 @@ export type AddMatchEventInput = {
   matchId: number;
   teamId: number;
   userId?: number | null;
+  relatedUserId?: number | null;
   eventType: string;
   minute?: number | null;
   note?: string | null;
+};
+
+export type MatchSquadPlayer = {
+  playerId: number;
+  playerName: string;
+};
+
+export type MatchTeamSquad = {
+  teamId: number;
+  activePlayers: MatchSquadPlayer[];
+  benchPlayers: MatchSquadPlayer[];
+  expelledPlayers: MatchSquadPlayer[];
+  substitutionsUsed: number;
+  substitutionsLimit: number | null;
 };
 
 const BRACKET_QUERY = `
@@ -115,9 +131,9 @@ const BRACKET_QUERY = `
       homeTeamId
       awayTeamId
       winnerTeamId
-      homeTeam { id name sigla createdByUserId }
-      awayTeam { id name sigla createdByUserId }
-      winnerTeam { id name sigla createdByUserId }
+      homeTeam { id name sigla shieldUrl createdByUserId }
+      awayTeam { id name sigla shieldUrl createdByUserId }
+      winnerTeam { id name sigla shieldUrl createdByUserId }
       matches {
         id
         status
@@ -143,7 +159,20 @@ const STANDINGS_QUERY = `
       lossesCount
       goalsCount
       championshipPosition
-      team { id name sigla createdByUserId }
+      team { id name sigla shieldUrl createdByUserId }
+    }
+  }
+`;
+
+const MATCH_TEAM_SQUADS_QUERY = `
+  query MatchTeamSquads($matchId: Int!) {
+    matchTeamSquads(matchId: $matchId) {
+      teamId
+      activePlayers { playerId playerName }
+      benchPlayers { playerId playerName }
+      expelledPlayers { playerId playerName }
+      substitutionsUsed
+      substitutionsLimit
     }
   }
 `;
@@ -174,9 +203,9 @@ const MATCH_DETAIL_QUERY = `
         id
         round
         isBye
-        homeTeam { id name sigla createdByUserId }
-        awayTeam { id name sigla createdByUserId }
-        winnerTeam { id name sigla createdByUserId }
+        homeTeam { id name sigla shieldUrl createdByUserId }
+        awayTeam { id name sigla shieldUrl createdByUserId }
+        winnerTeam { id name sigla shieldUrl createdByUserId }
       }
       events {
         id
@@ -228,6 +257,17 @@ export async function fetchChampionshipStandings(
     { championshipId: number }
   >(STANDINGS_QUERY, { championshipId }, token);
   return data.championshipStandings;
+}
+
+export async function fetchMatchTeamSquads(
+  token: string,
+  matchId: number,
+): Promise<MatchTeamSquad[]> {
+  const data = await graphqlRequest<
+    { matchTeamSquads: MatchTeamSquad[] },
+    { matchId: number }
+  >(MATCH_TEAM_SQUADS_QUERY, { matchId }, token);
+  return data.matchTeamSquads;
 }
 
 export async function fetchMatchDetail(
@@ -362,7 +402,75 @@ export function eventTypeLabel(type: string): string {
       return 'Pênalti convertido';
     case 'PENALTI_PERDIDO':
       return 'Pênalti perdido';
+    case 'SUBSTITUICAO':
+      return 'Substituição';
     default:
       return type;
   }
+}
+
+export function parseSubstitutionPlayerOut(note: string | null): number | null {
+  if (!note) {
+    return null;
+  }
+  try {
+    const parsed = JSON.parse(note) as { playerOutId?: number };
+    return typeof parsed.playerOutId === 'number' ? parsed.playerOutId : null;
+  } catch {
+    return null;
+  }
+}
+
+export function formatSubstitutionLabel(
+  playerInName: string | null | undefined,
+  playerOutName: string | null | undefined,
+): string {
+  if (playerInName && playerOutName) {
+    return `${playerOutName} → ${playerInName}`;
+  }
+  return playerInName ?? 'Substituição';
+}
+
+export function resolveChampionshipChampion(
+  championshipType: string,
+  standings: StandingRow[],
+  bracket: BracketGame[],
+): { teamId: number; name: string; sigla: string | null } | null {
+  const byPosition = standings.find((row) => row.championshipPosition === 1);
+  if (byPosition) {
+    return {
+      teamId: byPosition.teamId,
+      name: byPosition.team.name,
+      sigla: byPosition.team.sigla,
+    };
+  }
+
+  if (championshipType === 'PONTOS_CORRIDOS' && standings.length > 0) {
+    return {
+      teamId: standings[0].teamId,
+      name: standings[0].team.name,
+      sigla: standings[0].team.sigla,
+    };
+  }
+
+  if (championshipType === 'ELIMINATORIA') {
+    const decided = bracket.filter((game) => game.winnerTeamId != null);
+    if (decided.length === 0) {
+      return null;
+    }
+    const finalRound = Math.max(...decided.map((game) => game.round));
+    const finalGame =
+      decided.find((game) => game.round === finalRound && game.winnerTeam) ??
+      decided[decided.length - 1];
+    if (!finalGame?.winnerTeam) {
+      return null;
+    }
+    return {
+      teamId: finalGame.winnerTeam.id,
+      name: finalGame.winnerTeam.name,
+      sigla: finalGame.winnerTeam.sigla,
+    };
+  }
+
+  return null;
 }

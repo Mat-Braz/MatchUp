@@ -268,6 +268,40 @@ export async function searchTeams(
   return data.teams;
 }
 
+const PENDING_JOIN_TEAM_IDS_QUERY = `
+  query PendingChampionshipJoinTeamIds($championshipId: Int!) {
+    pendingChampionshipJoinTeamIds(championshipId: $championshipId)
+  }
+`;
+
+const PENDING_INVITE_TEAM_IDS_QUERY = `
+  query PendingChampionshipInviteTeamIds($championshipId: Int!) {
+    pendingChampionshipInviteTeamIds(championshipId: $championshipId)
+  }
+`;
+
+export async function fetchPendingChampionshipJoinTeamIds(
+  token: string,
+  championshipId: number,
+): Promise<number[]> {
+  const data = await graphqlRequest<
+    { pendingChampionshipJoinTeamIds: number[] },
+    { championshipId: number }
+  >(PENDING_JOIN_TEAM_IDS_QUERY, { championshipId }, token);
+  return data.pendingChampionshipJoinTeamIds;
+}
+
+export async function fetchPendingChampionshipInviteTeamIds(
+  token: string,
+  championshipId: number,
+): Promise<number[]> {
+  const data = await graphqlRequest<
+    { pendingChampionshipInviteTeamIds: number[] },
+    { championshipId: number }
+  >(PENDING_INVITE_TEAM_IDS_QUERY, { championshipId }, token);
+  return data.pendingChampionshipInviteTeamIds;
+}
+
 
 export type MyChampionshipItem = {
   id: number;
@@ -320,6 +354,25 @@ const MY_PROFILE_CHAMPIONSHIPS_QUERY = `
   }
 `;
 
+const MY_PROFILE_CHAMPIONSHIPS_PAGE_QUERY = `
+  query MyProfileChampionshipsPage($input: MyProfileChampionshipsPageInput) {
+    myProfileChampionshipsPage(input: $input) {
+      items {
+        id
+        name
+        status
+        relation
+        createdByMe
+        participating
+      }
+      totalCount
+      page
+      pageSize
+      totalPages
+    }
+  }
+`;
+
 export async function fetchRecommendedChampionships(token: string): Promise<Championship[]> {
   const data = await graphqlRequest<{ recommendedChampionships: Championship[] }>(
     RECOMMENDED_CHAMPIONSHIPS_QUERY,
@@ -347,6 +400,74 @@ export async function fetchMyProfileChampionships(
     { scope: MyChampionshipsScope }
   >(MY_PROFILE_CHAMPIONSHIPS_QUERY, { scope }, token);
   return data.myProfileChampionships;
+}
+
+export type MyProfileChampionshipsPageInput = {
+  scope?: MyChampionshipsScope;
+  page?: number;
+  pageSize?: number;
+};
+
+export type MyProfileChampionshipsPageResult = {
+  items: MyChampionshipItem[];
+  totalCount: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+};
+
+export async function fetchMyProfileChampionshipsPage(
+  token: string,
+  input: MyProfileChampionshipsPageInput = {},
+): Promise<MyProfileChampionshipsPageResult> {
+  const data = await graphqlRequest<
+    { myProfileChampionshipsPage: MyProfileChampionshipsPageResult },
+    { input: MyProfileChampionshipsPageInput }
+  >(MY_PROFILE_CHAMPIONSHIPS_PAGE_QUERY, { input }, token);
+  return data.myProfileChampionshipsPage;
+}
+
+export type ExploreChampionshipsInput = {
+  name?: string;
+  city?: string;
+  uf?: string;
+  championshipType?: ChampionshipType;
+  status?: ChampionshipStatus;
+  page?: number;
+  pageSize?: number;
+};
+
+export type ExploreChampionshipsResult = {
+  items: Championship[];
+  totalCount: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+};
+
+const EXPLORE_PUBLIC_CHAMPIONSHIPS_QUERY = `
+  query ExplorePublicChampionships($input: ExploreChampionshipsInput!) {
+    explorePublicChampionships(input: $input) {
+      items {
+        ${CHAMPIONSHIP_FIELDS}
+      }
+      totalCount
+      page
+      pageSize
+      totalPages
+    }
+  }
+`;
+
+export async function fetchExplorePublicChampionships(
+  token: string,
+  input: ExploreChampionshipsInput,
+): Promise<ExploreChampionshipsResult> {
+  const data = await graphqlRequest<
+    { explorePublicChampionships: ExploreChampionshipsResult },
+    { input: ExploreChampionshipsInput }
+  >(EXPLORE_PUBLIC_CHAMPIONSHIPS_QUERY, { input }, token);
+  return data.explorePublicChampionships;
 }
 
 export function championshipStatusLabel(status: ChampionshipStatus): string {

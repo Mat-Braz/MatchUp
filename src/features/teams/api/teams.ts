@@ -74,6 +74,36 @@ const MY_TEAMS_QUERY = `
   }
 `;
 
+const MY_TEAMS_PAGE_QUERY = `
+  query MyTeamsPage($input: MyTeamsPageInput) {
+    myTeamsPage(input: $input) {
+      items {
+        id
+        teamId
+        teamName
+        shieldUrl
+        role
+        position
+        membersCount
+        createdByUserId
+        isCreator
+      }
+      totalCount
+      page
+      pageSize
+      totalPages
+    }
+  }
+`;
+
+export type MyTeamsPageResult = {
+  items: MyTeamItem[];
+  totalCount: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+};
+
 const CREATE_TEAM_MUTATION = `
   mutation CreateTeam($input: CreateTeamInput!) {
     createTeam(input: $input) {
@@ -146,6 +176,12 @@ const INVITE_PLAYER_MUTATION = `
   }
 `;
 
+const PENDING_TEAM_INVITE_PLAYER_IDS_QUERY = `
+  query PendingTeamInvitePlayerIds($teamId: Int!) {
+    pendingTeamInvitePlayerIds(teamId: $teamId)
+  }
+`;
+
 const SAVE_TEAM_LINEUP_MUTATION = `
   mutation SaveTeamLineup($input: SaveTeamLineupInput!) {
     saveTeamLineup(input: $input) {
@@ -164,6 +200,17 @@ export async function fetchMyTeams(token: string): Promise<MyTeamItem[]> {
     token,
   );
   return data.myTeams;
+}
+
+export async function fetchMyTeamsPage(
+  token: string,
+  input: { page?: number; pageSize?: number } = {},
+): Promise<MyTeamsPageResult> {
+  const data = await graphqlRequest<
+    { myTeamsPage: MyTeamsPageResult },
+    { input: { page?: number; pageSize?: number } }
+  >(MY_TEAMS_PAGE_QUERY, { input }, token);
+  return data.myTeamsPage;
 }
 
 export async function createTeam(
@@ -274,6 +321,17 @@ export async function invitePlayerToTeam(
     { teamId, playerId },
     token,
   );
+}
+
+export async function fetchPendingTeamInvitePlayerIds(
+  token: string,
+  teamId: number,
+): Promise<number[]> {
+  const data = await graphqlRequest<
+    { pendingTeamInvitePlayerIds: number[] },
+    { teamId: number }
+  >(PENDING_TEAM_INVITE_PLAYER_IDS_QUERY, { teamId }, token);
+  return data.pendingTeamInvitePlayerIds;
 }
 
 export async function saveTeamLineup(

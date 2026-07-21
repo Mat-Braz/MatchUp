@@ -79,6 +79,12 @@ const MARK_ALL_ALERTS_READ_MUTATION = `
   }
 `;
 
+const CLEAR_MY_NOTIFICATIONS_MUTATION = `
+  mutation ClearMyNotifications($category: NotificationCategory) {
+    clearMyNotifications(category: $category)
+  }
+`;
+
 const NOTIFY_PLAYER_SUSPENSION_MUTATION = `
   mutation NotifyPlayerSuspension($input: NotifyPlayerSuspensionInput!) {
     notifyPlayerSuspension(input: $input) {
@@ -87,6 +93,18 @@ const NOTIFY_PLAYER_SUSPENSION_MUTATION = `
       type
       title
     }
+  }
+`;
+
+const UNREAD_NOTIFICATION_COUNT_QUERY = `
+  query UnreadNotificationCount {
+    unreadNotificationCount
+  }
+`;
+
+const REGISTER_PUSH_TOKEN_MUTATION = `
+  mutation RegisterPushToken($expoPushToken: String!) {
+    registerPushToken(expoPushToken: $expoPushToken)
   }
 `;
 
@@ -133,6 +151,17 @@ export async function markAllAlertsRead(token: string): Promise<number> {
   return data.markAllAlertsRead;
 }
 
+export async function clearMyNotifications(
+  token: string,
+  category?: NotificationCategory,
+): Promise<number> {
+  const data = await graphqlRequest<
+    { clearMyNotifications: number },
+    { category?: NotificationCategory }
+  >(CLEAR_MY_NOTIFICATIONS_MUTATION, category ? { category } : {}, token);
+  return data.clearMyNotifications;
+}
+
 export async function notifyPlayerSuspension(
   token: string,
   input: {
@@ -144,6 +173,26 @@ export async function notifyPlayerSuspension(
   },
 ): Promise<void> {
   await graphqlRequest(NOTIFY_PLAYER_SUSPENSION_MUTATION, { input }, token);
+}
+
+export async function fetchUnreadNotificationCount(token: string): Promise<number> {
+  const data = await graphqlRequest<{ unreadNotificationCount: number }>(
+    UNREAD_NOTIFICATION_COUNT_QUERY,
+    undefined,
+    token,
+  );
+  return data.unreadNotificationCount;
+}
+
+export async function registerPushToken(
+  token: string,
+  expoPushToken: string,
+): Promise<void> {
+  await graphqlRequest(
+    REGISTER_PUSH_TOKEN_MUTATION,
+    { expoPushToken },
+    token,
+  );
 }
 
 export function formatNotificationTime(iso: string): string {

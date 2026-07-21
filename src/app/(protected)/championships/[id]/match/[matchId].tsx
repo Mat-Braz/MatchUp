@@ -19,7 +19,10 @@ import { useAuth } from '@/features/auth';
 import {
   eventTypeLabel,
   fetchMatchDetail,
+  fetchMatchTeamSquads,
+  formatSubstitutionLabel,
   matchStatusLabel,
+  parseSubstitutionPlayerOut,
   startMatch,
   startPenalties,
   submitMatchResult,
@@ -27,9 +30,12 @@ import {
   rejectMatchResult,
   addMatchEvent,
   removeMatchEvent,
+  SubstitutionModal,
+  TeamShield,
   type MatchDetail,
+  type MatchTeamSquad,
 } from '@/features/championships';
-import { fetchTeamMembers, type TeamMember } from '@/features/teams';
+import { fetchTeam, fetchTeamMembers, type TeamDetails, type TeamMember } from '@/features/teams';
 import { fetchMe } from '@/features/profile';
 import { ApiError } from '@/lib/api/graphql';
 
@@ -56,14 +62,17 @@ export default function MatchScreen() {
   const matchId = Number(params.matchId);
 
   const [match, setMatch] = useState<MatchDetail | null>(null);
+  const [teamSquads, setTeamSquads] = useState<MatchTeamSquad[]>([]);
   const [userId, setUserId] = useState<number | null>(null);
-  const [homeMembers, setHomeMembers] = useState<TeamMember[]>([]);
-  const [awayMembers, setAwayMembers] = useState<TeamMember[]>([]);
+  const [allMembers, setAllMembers] = useState<TeamMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [acting, setActing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedTeamId, setSelectedTeamId] = useState<number | null>(null);
   const [selectedPlayerId, setSelectedPlayerId] = useState<number | null>(null);
+  const [subModalVisible, setSubModalVisible] = useState(false);
+  const [subTeamDetails, setSubTeamDetails] = useState<TeamDetails | null>(null);
+  const [loadingSubTeam, setLoadingSubTeam] = useState(false);
 
   const isOrganizer =
     match != null && userId != null && match.championship.responsibleUserId === userId;
@@ -84,18 +93,55 @@ export default function MatchScreen() {
     isOrganizer &&
     (match?.status === 'EM_ANDAMENTO' || match?.status === 'REVISAO');
 
-  const membersForSelected = useMemo(() => {
+  const selectedSquad = useMemo(() => {
+    if (selectedTeamId == null) {
+      return null;
+    }
+    return teamSquads.find((squad) => squad.teamId === selectedTeamId) ?? null;
+  }, [selectedTeamId, teamSquads]);
+
+  const activePlayersForSelected = selectedSquad?.activePlayers ?? [];
+
+  const substitutionEventsForSelected = useMemo(() => {
     if (!match || selectedTeamId == null) {
       return [];
     }
+    return match.events.filter(
+      (event) =>
+        event.eventType === 'SUBSTITUICAO' && event.teamId === selectedTeamId,
+    );
+  }, [match, selectedTeamId]);
+
+  const selectedTeamName = useMemo(() => {
+    if (!match || selectedTeamId == null) {
+      return '';
+    }
     if (selectedTeamId === match.game.homeTeam?.id) {
-      return homeMembers;
+      return match.game.homeTeam?.name ?? 'Time da casa';
     }
-    if (selectedTeamId === match.game.awayTeam?.id) {
-      return awayMembers;
+    return match.game.awayTeam?.name ?? 'Time visitante';
+  }, [match, selectedTeamId]);
+
+  const playerNameById = useMemo(() => {
+    const map = new Map<number, string>();
+    for (const member of allMembers) {
+      map.set(member.playerId, member.playerName);
     }
-    return [];
-  }, [awayMembers, homeMembers, match, selectedTeamId]);
+    for (const squad of teamSquads) {
+      for (const player of [...squad.activePlayers, ...squad.benchPlayers]) {
+        map.set(player.playerId, player.playerName);
+      }
+    }
+    return map;
+  }, [allMembers, teamSquads]);
+
+  const canOpenSubstitution =
+    match?.phase !== 'PENALTIS' &&
+    selectedSquad != null &&
+    (selectedSquad.substitutionsLimit == null ||
+      selectedSquad.substitutionsUsed < selectedSquad.substitutionsLimit) &&
+    selectedSquad.benchPlayers.length > 0 &&
+    selectedSquad.activePlayers.length > 0;
 
   const load = useCallback(async (options?: { silent?: boolean }) => {
     if (!token || !Number.isFinite(matchId)) {
@@ -109,16 +155,22 @@ export default function MatchScreen() {
     }
     try {
       if (silent) {
-        const detail = await fetchMatchDetail(token, matchId);
+        const [detail, squads] = await Promise.all([
+          fetchMatchDetail(token, matchId),
+          fetchMatchTeamSquads(token, matchId),
+        ]);
         setMatch(detail);
+        setTeamSquads(squads);
         return;
       }
 
-      const [detail, me] = await Promise.all([
+      const [detail, me, squads] = await Promise.all([
         fetchMatchDetail(token, matchId),
         fetchMe(token),
+        fetchMatchTeamSquads(token, matchId),
       ]);
       setMatch(detail);
+      setTeamSquads(squads);
       setUserId(me.id);
       setSelectedTeamId((current) => current ?? detail.game.homeTeam?.id ?? null);
 
@@ -130,8 +182,7 @@ export default function MatchScreen() {
           ? fetchTeamMembers(token, detail.game.awayTeam.id)
           : Promise.resolve([]),
       ]);
-      setHomeMembers(home);
-      setAwayMembers(away);
+      setAllMembers([...home, ...away]);
       setError(null);
     } catch (err) {
       if (!silent) {
@@ -203,11 +254,52 @@ export default function MatchScreen() {
     });
   }
 
+  async function handleOpenSubstitution() {
+    if (!token || selectedTeamId == null || !canOpenSubstitution) {
+      return;
+    }
+    setLoadingSubTeam(true);
+    setError(null);
+    try {
+      const team = await fetchTeam(token, selectedTeamId);
+      setSubTeamDetails(team);
+      setSubModalVisible(true);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Falha ao carregar formação.');
+    } finally {
+      setLoadingSubTeam(false);
+    }
+  }
+
+  async function handleSubstitution(playerOutId: number, playerInId: number) {
+    if (!token || !match || selectedTeamId == null) {
+      return;
+    }
+    await runAction(async () => {
+      await addMatchEvent(token, {
+        matchId: match.id,
+        teamId: selectedTeamId,
+        userId: playerInId,
+        relatedUserId: playerOutId,
+        eventType: 'SUBSTITUICAO',
+      });
+      setSubModalVisible(false);
+      if (selectedPlayerId === playerOutId) {
+        setSelectedPlayerId(null);
+      }
+    });
+  }
+
   const scoreText = match
     ? match.phase === 'PENALTIS'
-      ? `${match.homeScore ?? 0} x ${match.awayScore ?? 0}  (pên. ${match.penaltyHomeScore ?? 0} x ${match.penaltyAwayScore ?? 0})`
+      ? `${match.homeScore ?? 0} x ${match.awayScore ?? 0}`
       : `${match.homeScore ?? 0} x ${match.awayScore ?? 0}`
     : '';
+
+  const penaltyText =
+    match?.phase === 'PENALTIS'
+      ? `Pên. ${match.penaltyHomeScore ?? 0} x ${match.penaltyAwayScore ?? 0}`
+      : null;
 
   return (
     <View style={[styles.root, { paddingTop: insets.top + 8 }]}>
@@ -239,13 +331,26 @@ export default function MatchScreen() {
         {match && !loading ? (
           <>
             <View style={styles.scoreCard}>
-              <Text style={styles.teamName} numberOfLines={1}>
-                {match.game.homeTeam?.name ?? '—'}
-              </Text>
-              <Text style={styles.score}>{scoreText}</Text>
-              <Text style={styles.teamName} numberOfLines={1}>
-                {match.game.awayTeam?.name ?? '—'}
-              </Text>
+              <View style={styles.scoreSide}>
+                <TeamShield team={match.game.homeTeam} size={64} />
+                <Text style={styles.teamName} numberOfLines={2}>
+                  {match.game.homeTeam?.name ?? '—'}
+                </Text>
+              </View>
+
+              <View style={styles.scoreCenter}>
+                <Text style={styles.score}>{scoreText}</Text>
+                {penaltyText ? (
+                  <Text style={styles.penaltyScore}>{penaltyText}</Text>
+                ) : null}
+              </View>
+
+              <View style={styles.scoreSide}>
+                <TeamShield team={match.game.awayTeam} size={64} />
+                <Text style={styles.teamName} numberOfLines={2}>
+                  {match.game.awayTeam?.name ?? '—'}
+                </Text>
+              </View>
             </View>
 
             {isOrganizer && match.status === 'AGENDADA' ? (
@@ -277,6 +382,7 @@ export default function MatchScreen() {
                         onPress={() => {
                           setSelectedTeamId(team.id);
                           setSelectedPlayerId(null);
+                          setSubModalVisible(false);
                         }}
                       >
                         <Text
@@ -292,28 +398,56 @@ export default function MatchScreen() {
                   )}
                 </View>
 
-                <Text style={styles.hint}>Jogador (obrigatório para gols, cartões e faltas)</Text>
+                <Text style={styles.hint}>
+                  Jogadores em campo (obrigatório para gols, cartões e faltas)
+                </Text>
+                {activePlayersForSelected.length === 0 ? (
+                  <Text style={styles.hint}>
+                    Nenhum jogador escalado em campo. Verifique a escalação do time.
+                  </Text>
+                ) : null}
+                {(selectedSquad?.expelledPlayers.length ?? 0) > 0 ? (
+                  <Text style={styles.expelledHint}>
+                    Expulsos:{' '}
+                    {selectedSquad!.expelledPlayers.map((p) => p.playerName).join(', ')}
+                  </Text>
+                ) : null}
                 <View style={styles.rowWrap}>
-                  {membersForSelected.map((member) => (
+                  {activePlayersForSelected.map((player) => (
                     <Pressable
-                      key={member.playerId}
+                      key={player.playerId}
                       style={[
                         styles.chip,
-                        selectedPlayerId === member.playerId && styles.chipActive,
+                        selectedPlayerId === player.playerId && styles.chipActive,
                       ]}
-                      onPress={() => setSelectedPlayerId(member.playerId)}
+                      onPress={() => setSelectedPlayerId(player.playerId)}
                     >
                       <Text
                         style={[
                           styles.chipText,
-                          selectedPlayerId === member.playerId && styles.chipTextActive,
+                          selectedPlayerId === player.playerId && styles.chipTextActive,
                         ]}
                       >
-                        {member.playerName}
+                        {player.playerName}
                       </Text>
                     </Pressable>
                   ))}
                 </View>
+
+                {match.phase !== 'PENALTIS' ? (
+                  <Pressable
+                    style={[
+                      styles.secondaryBtn,
+                      (!canOpenSubstitution || loadingSubTeam) && styles.btnDisabled,
+                    ]}
+                    disabled={acting || !canOpenSubstitution || loadingSubTeam}
+                    onPress={() => void handleOpenSubstitution()}
+                  >
+                    <Text style={styles.secondaryBtnText}>
+                      {loadingSubTeam ? 'Carregando...' : 'Substituir jogador'}
+                    </Text>
+                  </Pressable>
+                ) : null}
 
                 <View style={styles.rowWrap}>
                   {(match.phase === 'PENALTIS' ? PENALTY_EVENTS : REGULAR_EVENTS).map(
@@ -408,13 +542,27 @@ export default function MatchScreen() {
               {match.events.length === 0 ? (
                 <Text style={styles.hint}>Nenhum evento registrado.</Text>
               ) : (
-                match.events.map((event) => (
+                match.events.map((event) => {
+                  const playerOutId =
+                    event.eventType === 'SUBSTITUICAO'
+                      ? parseSubstitutionPlayerOut(event.note)
+                      : null;
+                  const eventLabel =
+                    event.eventType === 'SUBSTITUICAO'
+                      ? formatSubstitutionLabel(
+                          event.user?.name ?? playerNameById.get(event.userId ?? -1),
+                          playerOutId != null
+                            ? playerNameById.get(playerOutId)
+                            : undefined,
+                        )
+                      : event.user
+                        ? `${eventTypeLabel(event.eventType)} — ${event.user.name}`
+                        : eventTypeLabel(event.eventType);
+
+                  return (
                   <View key={event.id} style={styles.eventRow}>
                     <View style={{ flex: 1 }}>
-                      <Text style={styles.eventTitle}>
-                        {eventTypeLabel(event.eventType)}
-                        {event.user ? ` — ${event.user.name}` : ''}
-                      </Text>
+                      <Text style={styles.eventTitle}>{eventLabel}</Text>
                       <Text style={styles.hint}>{event.team.name}</Text>
                     </View>
                     {canEditEvents ? (
@@ -433,7 +581,8 @@ export default function MatchScreen() {
                       </Pressable>
                     ) : null}
                   </View>
-                ))
+                  );
+                })
               )}
             </View>
 
@@ -449,6 +598,21 @@ export default function MatchScreen() {
           </>
         ) : null}
       </ScrollView>
+
+      <SubstitutionModal
+        visible={subModalVisible}
+        onClose={() => setSubModalVisible(false)}
+        teamName={selectedTeamName}
+        squad={selectedSquad}
+        squadSize={subTeamDetails?.squadSize ?? null}
+        formation={subTeamDetails?.formation ?? null}
+        lineup={subTeamDetails?.lineup ?? null}
+        substitutionEvents={substitutionEventsForSelected}
+        acting={acting}
+        onConfirm={(playerOutId, playerInId) =>
+          void handleSubstitution(playerOutId, playerInId)
+        }
+      />
     </View>
   );
 }
@@ -478,22 +642,44 @@ const styles = StyleSheet.create({
   body: { paddingHorizontal: 20, gap: 14 },
   scoreCard: {
     backgroundColor: theme.colors.surfaceCard,
-    borderRadius: 14,
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: theme.colors.border,
-    padding: 16,
-    gap: 8,
+    borderColor: theme.colors.borderStrong,
+    paddingVertical: 18,
+    paddingHorizontal: 14,
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
+  scoreSide: {
+    flex: 1,
+    alignItems: 'center',
+    gap: 8,
+  },
+  scoreCenter: {
+    minWidth: 88,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
   },
   teamName: {
     color: theme.colors.text,
-    fontSize: 15,
+    fontSize: 12,
     fontWeight: theme.fontWeights.semibold,
+    textAlign: 'center',
   },
   score: {
     color: theme.colors.primary,
     fontSize: 28,
     fontWeight: theme.fontWeights.extraBold,
+    textAlign: 'center',
+  },
+  penaltyScore: {
+    color: theme.colors.textMuted,
+    fontSize: 12,
+    fontWeight: theme.fontWeights.bold,
+    textAlign: 'center',
   },
   section: { gap: 10 },
   sectionTitle: {
@@ -502,6 +688,11 @@ const styles = StyleSheet.create({
     fontWeight: theme.fontWeights.bold,
   },
   hint: { color: theme.colors.textMuted, fontSize: 13 },
+  expelledHint: {
+    color: theme.colors.dangerSoft,
+    fontSize: 12,
+    fontWeight: theme.fontWeights.semibold,
+  },
   row: { flexDirection: 'row', gap: 8 },
   rowWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip: {
@@ -516,6 +707,7 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.primary,
     borderColor: theme.colors.primary,
   },
+  btnDisabled: { opacity: 0.5 },
   chipText: {
     color: theme.colors.text,
     fontSize: 12,

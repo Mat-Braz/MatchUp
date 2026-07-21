@@ -4,6 +4,7 @@ import {
   Pressable,
   StyleSheet,
   Text,
+  TextInput,
   View,
   useWindowDimensions,
 } from 'react-native';
@@ -13,6 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter, type Href } from 'expo-router';
 
 import { PencilScreen } from '@/features/auth';
+import { useNotificationBadge } from '@/features/notifications';
 import { theme } from '@/constants/theme';
 
 const fullLogo = require('../../../assets/images/RgTnC.png') as ImageSourcePropType;
@@ -97,11 +99,51 @@ export function ScreenTitle({ children, action }: { children: string; action?: s
   );
 }
 
-export function SearchBox({ placeholder }: { placeholder: string }) {
+export function SearchBox({
+  placeholder,
+  value,
+  onChangeText,
+  onFilterPress,
+  showFilter = false,
+}: {
+  placeholder: string;
+  value?: string;
+  onChangeText?: (text: string) => void;
+  onFilterPress?: () => void;
+  showFilter?: boolean;
+}) {
+  const interactive = onChangeText != null;
+
   return (
-    <View style={styles.searchBox}>
-      <Image source={navIcons.search.inactive} style={styles.searchIconImage} resizeMode="contain" />
-      <Text style={styles.searchPlaceholder}>{placeholder}</Text>
+    <View style={[styles.searchRow, showFilter && styles.searchRowWithFilter]}>
+      <View style={[styles.searchBox, showFilter && styles.searchBoxCompact]}>
+        <Image
+          source={navIcons.search.inactive}
+          style={styles.searchIconImage}
+          resizeMode="contain"
+        />
+        {interactive ? (
+          <TextInput
+            style={styles.searchInput}
+            placeholder={placeholder}
+            placeholderTextColor="#80808A"
+            value={value}
+            onChangeText={onChangeText}
+            returnKeyType="search"
+          />
+        ) : (
+          <Text style={styles.searchPlaceholder}>{placeholder}</Text>
+        )}
+      </View>
+      {showFilter ? (
+        <Pressable
+          style={styles.filterButton}
+          onPress={onFilterPress}
+          hitSlop={8}
+        >
+          <Ionicons name="options-outline" size={20} color={theme.colors.text} />
+        </Pressable>
+      ) : null}
     </View>
   );
 }
@@ -118,14 +160,32 @@ export function EmptyState({ top, title, message }: { top: number; title: string
   );
 }
 
-export function Chips({ items, top }: { items: string[]; top: number }) {
+export function Chips({
+  items,
+  top,
+  selectedIndex = 0,
+  onSelect,
+}: {
+  items: string[];
+  top: number;
+  selectedIndex?: number;
+  onSelect?: (index: number) => void;
+}) {
   return (
     <View style={[styles.chips, { top }]}>
-      {items.map((item, index) => (
-        <View key={item} style={[styles.chip, index === 0 && styles.chipActive]}>
-          <Text style={[styles.chipText, index === 0 && styles.chipTextActive]}>{item}</Text>
-        </View>
-      ))}
+      {items.map((item, index) => {
+        const active = index === selectedIndex;
+        return (
+          <Pressable
+            key={item}
+            disabled={!onSelect}
+            style={[styles.chip, active && styles.chipActive]}
+            onPress={() => onSelect?.(index)}
+          >
+            <Text style={[styles.chipText, active && styles.chipTextActive]}>{item}</Text>
+          </Pressable>
+        );
+      })}
     </View>
   );
 }
@@ -140,7 +200,8 @@ export function ChampionshipCard({
   actionLabel,
   onPress,
 }: {
-  top: number;
+  /** Absolute Y when laid out on the Pencil canvas; omit for in-flow ScrollView lists. */
+  top?: number;
   title: string;
   status?: string;
   year?: string;
@@ -155,7 +216,9 @@ export function ChampionshipCard({
       disabled={!onPress}
       style={({ pressed }) => [
         styles.champCard,
-        { top },
+        top != null
+          ? { position: 'absolute', left: 24, top }
+          : styles.champCardInFlow,
         pressed && onPress ? { opacity: 0.9 } : null,
       ]}
     >
@@ -311,6 +374,7 @@ export function ProfileMenu({
 function BottomNav({ active }: { active: TabName }) {
   const router = useRouter();
   const { width } = useWindowDimensions();
+  const { hasUnread } = useNotificationBadge();
   const tabs: {
     label: TabName;
     icon?: NavIconName;
@@ -343,19 +407,24 @@ function BottomNav({ active }: { active: TabName }) {
             style={[styles.navItem, isActive && styles.navItemActive]}
             onPress={() => router.push(tab.route)}
           >
-            {tab.ionicon ? (
-              <Ionicons
-                name={tab.ionicon}
-                size={20}
-                color={isActive ? theme.colors.primary : '#80808A'}
-              />
-            ) : tab.icon ? (
-              <Image
-                source={navIcons[tab.icon][isActive ? 'active' : 'inactive']}
-                style={styles.navIconImage}
-                resizeMode="contain"
-              />
-            ) : null}
+            <View style={styles.navIconWrap}>
+              {tab.ionicon ? (
+                <Ionicons
+                  name={tab.ionicon}
+                  size={20}
+                  color={isActive ? theme.colors.primary : '#80808A'}
+                />
+              ) : tab.icon ? (
+                <Image
+                  source={navIcons[tab.icon][isActive ? 'active' : 'inactive']}
+                  style={styles.navIconImage}
+                  resizeMode="contain"
+                />
+              ) : null}
+              {tab.label === 'Notificações' && hasUnread ? (
+                <View style={styles.navBadgeDot} />
+              ) : null}
+            </View>
             <Text style={[styles.navLabel, isActive && styles.navActive]} numberOfLines={1}>
               {tab.label}
             </Text>
@@ -432,10 +501,7 @@ const styles = StyleSheet.create({
     lineHeight: 32,
   },
   searchBox: {
-    position: 'absolute',
-    left: 24,
-    top: 115,
-    width: 342,
+    flex: 1,
     height: 40,
     flexDirection: 'row',
     alignItems: 'center',
@@ -443,6 +509,38 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     backgroundColor: theme.colors.surfaceCard,
     paddingHorizontal: 14,
+  },
+  searchRow: {
+    position: 'absolute',
+    left: 24,
+    top: 115,
+    width: 342,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  searchRowWithFilter: {
+    width: 342,
+  },
+  searchBoxCompact: {
+    flex: 1,
+  },
+  filterButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 8,
+    backgroundColor: theme.colors.surfaceCard,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  searchInput: {
+    flex: 1,
+    color: theme.colors.text,
+    fontSize: 14,
+    fontWeight: '600',
+    paddingVertical: 0,
   },
   searchPlaceholder: {
     color: '#80808A',
@@ -497,6 +595,7 @@ const styles = StyleSheet.create({
     left: 24,
     width: 342,
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 8,
   },
   chip: {
@@ -518,13 +617,17 @@ const styles = StyleSheet.create({
     color: theme.colors.black,
   },
   champCard: {
-    position: 'absolute',
-    left: 24,
     width: 342,
     height: 150,
     borderRadius: 16,
     backgroundColor: theme.colors.surfaceCard,
     padding: 18,
+  },
+  champCardInFlow: {
+    position: 'relative',
+    left: 0,
+    width: '100%',
+    marginBottom: 12,
   },
   cardHeader: {
     flexDirection: 'row',
@@ -834,6 +937,23 @@ const styles = StyleSheet.create({
   navIconImage: {
     width: 20,
     height: 20,
+  },
+  navIconWrap: {
+    width: 24,
+    height: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  navBadgeDot: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: theme.colors.primary,
+    borderWidth: 1,
+    borderColor: theme.colors.surfaceLow,
   },
   navLabel: {
     color: theme.colors.textDim,

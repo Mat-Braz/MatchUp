@@ -1,6 +1,8 @@
 export {
   createTeam,
   fetchMyTeams,
+  fetchMyTeamsPage,
+  fetchPendingTeamInvitePlayerIds,
   fetchTeam,
   fetchTeamMembers,
   formatTeamRoleLabel,
@@ -15,6 +17,7 @@ export type {
   CreateTeamInput,
   LineupSlotInput,
   MyTeamItem,
+  MyTeamsPageResult,
   PlayerTeamRole,
   TeamDetails,
   TeamMember,

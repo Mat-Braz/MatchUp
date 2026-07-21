@@ -147,7 +147,7 @@ export default function PersonalDataScreen() {
   }
 
   return (
-    <PencilScreen keyboardScroll>
+    <PencilScreen scroll canvasHeight={940}>
       <AuthTitle
         title="Dados pessoais"
         subtitle="Complete seu perfil para participar dos campeonatos"
