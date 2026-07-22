@@ -75,10 +75,9 @@ export {
   useChampionshipWizard,
 } from './context/ChampionshipWizardContext';
 export type { ChampionshipDraft } from './context/ChampionshipWizardContext';
-export {
-  ExploreFilterModal,
-  type ExploreAdvancedFilters,
-} from './components/ExploreFilterModal';
+export { ExploreFilterModal } from './components/ExploreFilterModal';
+export type { ExploreAdvancedFilters } from './components/ExploreFilterModal';
 export { BracketTreeModal } from './components/BracketTreeModal';
 export { TeamShield } from './components/TeamShield';
 export { SubstitutionModal } from './components/SubstitutionModal';
+export { MatchEventsTimeline } from './components/MatchEventsTimeline';

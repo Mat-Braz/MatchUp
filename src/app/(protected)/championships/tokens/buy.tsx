@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -9,12 +9,11 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 
-import { championshipRoutes } from '@/constants/championshipRoutes';
+import { tokenRoutes, type TokenFlowReason } from '@/constants/tokenRoutes';
 import { theme } from '@/constants/theme';
 import { useAuth } from '@/features/auth';
-import { useChampionshipWizard } from '@/features/championships';
 import { PrimaryButton } from '@/features/championships/components/WizardShell';
 import {
   fetchTokenCatalog,
@@ -25,11 +24,20 @@ import {
 import { ApiError } from '@/lib/api/graphql';
 import { formatCurrencyBRL } from '@/lib/masks';
 
+function resolveReason(raw: string | string[] | undefined): TokenFlowReason {
+  const value = Array.isArray(raw) ? raw[0] : raw;
+  if (value === 'card' || value === 'championship' || value === 'general') {
+    return value;
+  }
+  return 'general';
+}
+
 export default function BuyTokensScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { token } = useAuth();
-  const { setLastPurchase } = useChampionshipWizard();
+  const params = useLocalSearchParams<{ reason?: string }>();
+  const reason = useMemo(() => resolveReason(params.reason), [params.reason]);
 
   const [catalog, setCatalog] = useState<TokenPackOffer[]>([]);
   const [selected, setSelected] = useState<TokenPack>('TEN');
@@ -69,8 +77,13 @@ export default function BuyTokensScreen() {
     setError(null);
     try {
       const result = await purchaseTokenPack(token, selected);
-      setLastPurchase(result);
-      router.replace(championshipRoutes.tokensAdded as never);
+      router.replace(
+        tokenRoutes.addedWithParams({
+          reason,
+          credited: result.credited,
+          balance: result.balance,
+        }) as never,
+      );
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Falha na compra mock.');
     } finally {

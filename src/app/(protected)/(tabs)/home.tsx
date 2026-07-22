@@ -12,6 +12,7 @@ import {
   SectionLabel,
 } from '@/components/layout/PencilProtected';
 import { championshipRoutes } from '@/constants/championshipRoutes';
+import { tokenRoutes } from '@/constants/tokenRoutes';
 import { theme } from '@/constants/theme';
 import { useAuth } from '@/features/auth';
 import {
@@ -133,7 +134,7 @@ export default function HomeScreen() {
   }
 
   function handleBuyTokensPress() {
-    router.push(championshipRoutes.buyTokens as never);
+    router.push(tokenRoutes.buyWithReason('general') as never);
   }
 
   return (

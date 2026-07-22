@@ -1,21 +1,42 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import { championshipRoutes } from '@/constants/championshipRoutes';
+import { tokenRoutes, type TokenFlowReason } from '@/constants/tokenRoutes';
 import { theme } from '@/constants/theme';
 import { useAuth } from '@/features/auth';
 import { PrimaryButton } from '@/features/championships/components/WizardShell';
 import { fetchMyTokenBalance } from '@/features/tokens';
 import { ApiError } from '@/lib/api/graphql';
 
+function resolveReason(raw: string | string[] | undefined): TokenFlowReason {
+  const value = Array.isArray(raw) ? raw[0] : raw;
+  if (value === 'card' || value === 'championship' || value === 'general') {
+    return value;
+  }
+  return 'general';
+}
+
+const COPY: Record<TokenFlowReason, string> = {
+  championship:
+    'Você precisa de 1 token para criar um campeonato. Compre avulso ou assine um plano.',
+  card:
+    'Você precisa de 1 token para desbloquear esta edição da carta. Compre avulso ou assine um plano.',
+  general:
+    'Você está sem tokens. Compre avulso ou assine um plano para continuar.',
+};
+
 export default function NoTokensScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { token } = useAuth();
+  const params = useLocalSearchParams<{ reason?: string }>();
+  const reason = useMemo(() => resolveReason(params.reason), [params.reason]);
+
   const [balance, setBalance] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -50,9 +71,7 @@ export default function NoTokensScreen() {
         <Ionicons name="ticket-outline" size={56} color={theme.colors.primary} />
       </View>
       <Text style={styles.title}>Sem tokens</Text>
-      <Text style={styles.subtitle}>
-        Você precisa de 1 token para criar um campeonato. Compre avulso ou assine um plano.
-      </Text>
+      <Text style={styles.subtitle}>{COPY[reason]}</Text>
 
       <View style={styles.balanceCard}>
         <Text style={styles.balanceLabel}>Saldo atual</Text>
@@ -67,7 +86,7 @@ export default function NoTokensScreen() {
 
       <PrimaryButton
         label="Comprar tokens"
-        onPress={() => router.push(championshipRoutes.buyTokens as never)}
+        onPress={() => router.push(tokenRoutes.buyWithReason(reason) as never)}
       />
       <Pressable
         onPress={() => router.push(championshipRoutes.subscriptions as never)}

@@ -12,7 +12,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
 import { theme } from '@/constants/theme';
-import type { MatchEvent, MatchTeamSquad } from '@/features/championships/api/tournament';
+import type { MatchEvent, MatchSquadPlayer, MatchTeamSquad } from '@/features/championships/api/tournament';
 import { parseSubstitutionPlayerOut } from '@/features/championships/api/tournament';
 import {
   formationsForSquadSize,
@@ -33,6 +33,12 @@ type SubstitutionModalProps = {
   acting: boolean;
   onConfirm: (playerOutId: number, playerInId: number) => void;
 };
+
+function CardIcon({ color }: { color: string }) {
+  return (
+    <View style={[styles.cardIcon, { backgroundColor: color, borderColor: color }]} />
+  );
+}
 
 function buildCurrentAssignments(
   lineup: string | null,
@@ -92,10 +98,13 @@ export function SubstitutionModal({
     [lineup, substitutionEvents],
   );
 
-  const activeNameById = useMemo(() => {
-    const map = new Map<number, string>();
+  const onFieldById = useMemo(() => {
+    const map = new Map<number, MatchSquadPlayer>();
     for (const player of squad?.activePlayers ?? []) {
-      map.set(player.playerId, player.playerName);
+      map.set(player.playerId, player);
+    }
+    for (const player of squad?.expelledPlayers ?? []) {
+      map.set(player.playerId, player);
     }
     return map;
   }, [squad]);
@@ -145,10 +154,22 @@ export function SubstitutionModal({
           </View>
 
           {squad?.substitutionsLimit != null ? (
-            <Text style={styles.hint}>
-              Substituídos: {squad.substitutionsUsed}/{squad.substitutionsLimit}
+            <Text
+              style={[
+                styles.hint,
+                squad.substitutionsUsed >= squad.substitutionsLimit &&
+                  styles.limitReached,
+              ]}
+            >
+              Substituídos deste time: {squad.substitutionsUsed}/
+              {squad.substitutionsLimit}
+              {squad.substitutionsUsed >= squad.substitutionsLimit
+                ? ' — limite atingido'
+                : ''}
             </Text>
-          ) : null}
+          ) : (
+            <Text style={styles.hint}>Sem limite de substituições neste campeonato</Text>
+          )}
 
           <Text style={styles.stepHint}>
             1. Toque em quem sai • 2. Toque em quem entra do banco
@@ -165,19 +186,24 @@ export function SubstitutionModal({
                   <View style={styles.halfway} />
                   {formationDef.slots.map((slot) => {
                     const assignedId = assignments[slot.id];
-                    const isActive =
-                      assignedId != null && activeNameById.has(assignedId);
-                    if (!isActive || assignedId == null) {
+                    const player =
+                      assignedId != null ? onFieldById.get(assignedId) : undefined;
+                    if (!player || assignedId == null) {
                       return null;
                     }
 
-                    const name = activeNameById.get(assignedId);
-                    const selected = playerOutId === assignedId;
+                    const expelled = player.isExpelled;
+                    const selected = !expelled && playerOutId === assignedId;
+                    const showYellow = !expelled && player.yellowCards >= 1;
 
                     return (
                       <Pressable
                         key={slot.id}
+                        disabled={expelled}
                         onPress={() => {
+                          if (expelled) {
+                            return;
+                          }
                           setPlayerOutId(assignedId);
                           if (playerInId === assignedId) {
                             setPlayerInId(null);
@@ -187,12 +213,36 @@ export function SubstitutionModal({
                           styles.slot,
                           { left: `${slot.x}%`, top: `${slot.y}%` },
                           selected && styles.slotSelected,
+                          expelled && styles.slotExpelled,
                         ]}
                       >
-                        <Text style={styles.slotLabel}>{slot.label}</Text>
-                        <Text style={styles.slotName} numberOfLines={1}>
-                          {name?.split(' ')[0] ?? '—'}
+                        <Text
+                          style={[
+                            styles.slotLabel,
+                            expelled && styles.slotTextDisabled,
+                          ]}
+                        >
+                          {slot.label}
                         </Text>
+                        <Text
+                          style={[
+                            styles.slotName,
+                            expelled && styles.slotTextDisabled,
+                          ]}
+                          numberOfLines={1}
+                        >
+                          {player.playerName.split(' ')[0]}
+                        </Text>
+                        {expelled ? (
+                          <View style={styles.slotCardBadge}>
+                            <CardIcon color="#E53935" />
+                          </View>
+                        ) : null}
+                        {showYellow ? (
+                          <View style={styles.slotCardBadge}>
+                            <CardIcon color="#F5C518" />
+                          </View>
+                        ) : null}
                       </Pressable>
                     );
                   })}
@@ -211,15 +261,33 @@ export function SubstitutionModal({
                       ]}
                       onPress={() => setPlayerOutId(player.playerId)}
                     >
-                      <Text
-                        style={[
-                          styles.chipText,
-                          playerOutId === player.playerId && styles.chipTextSelected,
-                        ]}
-                      >
-                        {player.playerName}
-                      </Text>
+                      <View style={styles.chipContent}>
+                        <Text
+                          style={[
+                            styles.chipText,
+                            playerOutId === player.playerId && styles.chipTextSelected,
+                          ]}
+                        >
+                          {player.playerName}
+                        </Text>
+                        {player.yellowCards >= 1 ? (
+                          <CardIcon color="#F5C518" />
+                        ) : null}
+                      </View>
                     </Pressable>
+                  ))}
+                  {(squad?.expelledPlayers ?? []).map((player) => (
+                    <View
+                      key={player.playerId}
+                      style={[styles.chip, styles.chipExpelled]}
+                    >
+                      <View style={styles.chipContent}>
+                        <Text style={[styles.chipText, styles.chipTextDisabled]}>
+                          {player.playerName}
+                        </Text>
+                        <CardIcon color="#E53935" />
+                      </View>
+                    </View>
                   ))}
                 </View>
               </View>
@@ -256,7 +324,7 @@ export function SubstitutionModal({
 
             {playerOutId != null && playerInId != null ? (
               <Text style={styles.preview}>
-                {activeNameById.get(playerOutId) ?? 'Jogador'} →{' '}
+                {onFieldById.get(playerOutId)?.playerName ?? 'Jogador'} →{' '}
                 {squad?.benchPlayers.find((p) => p.playerId === playerInId)?.playerName ??
                   'Reserva'}
               </Text>
@@ -314,6 +382,10 @@ const styles = StyleSheet.create({
   hint: {
     color: theme.colors.textMuted,
     fontSize: 13,
+  },
+  limitReached: {
+    color: theme.colors.dangerSoft,
+    fontWeight: theme.fontWeights.semibold,
   },
   stepHint: {
     color: theme.colors.primarySoft,
@@ -378,6 +450,11 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.primary,
     backgroundColor: 'rgba(0,40,0,0.85)',
   },
+  slotExpelled: {
+    opacity: 0.45,
+    borderColor: '#E53935',
+    backgroundColor: 'rgba(40,0,0,0.55)',
+  },
   slotLabel: {
     color: 'rgba(255,255,255,0.7)',
     fontSize: 9,
@@ -387,6 +464,21 @@ const styles = StyleSheet.create({
     color: theme.colors.text,
     fontSize: 11,
     fontWeight: theme.fontWeights.bold,
+  },
+  slotTextDisabled: {
+    color: 'rgba(255,255,255,0.45)',
+  },
+  slotCardBadge: {
+    position: 'absolute',
+    right: -2,
+    top: -2,
+  },
+  cardIcon: {
+    width: 10,
+    height: 14,
+    borderRadius: 2,
+    borderWidth: 1,
+    transform: [{ rotate: '12deg' }],
   },
   fallbackBlock: { gap: 8 },
   blockTitle: {
@@ -410,6 +502,15 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.primary,
     borderColor: theme.colors.primary,
   },
+  chipExpelled: {
+    opacity: 0.5,
+    borderColor: '#E53935',
+  },
+  chipContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
   chipText: {
     color: theme.colors.text,
     fontSize: 12,
@@ -417,6 +518,9 @@ const styles = StyleSheet.create({
   },
   chipTextSelected: {
     color: theme.colors.black,
+  },
+  chipTextDisabled: {
+    color: theme.colors.textMuted,
   },
   benchTitle: {
     color: theme.colors.text,

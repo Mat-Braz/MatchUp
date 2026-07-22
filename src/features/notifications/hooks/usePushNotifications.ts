@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { Platform } from 'react-native';
 
 import Constants from 'expo-constants';
+import { requireOptionalNativeModule } from 'expo-modules-core';
 
 import { useAuth } from '@/features/auth';
 import { registerPushToken } from '@/features/notifications/api/notifications';
@@ -11,12 +12,12 @@ function canUseNativePush(): boolean {
     return false;
   }
 
-  // Expo Go does not ship ExpoPushTokenManager for this SDK setup.
+  // Expo Go / builds antigos podem não ter o módulo nativo.
   if (Constants.appOwnership === 'expo') {
     return false;
   }
 
-  return true;
+  return requireOptionalNativeModule('ExpoPushTokenManager') != null;
 }
 
 async function resolveExpoPushToken(): Promise<string | null> {

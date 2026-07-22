@@ -165,7 +165,12 @@ export default function ProfileScreen() {
 
   const menuItems = useMemo<ProfileMenuItem[]>(
     () => [
-      { key: "card", label: "Minha Carta", icon: "id-card-outline" },
+      {
+        key: "card",
+        label: "Minha Carta",
+        icon: "id-card-outline",
+        onPress: () => router.push(protectedProfileRoutes.myCard),
+      },
       {
         key: "edit",
         label: "Editar Perfil",

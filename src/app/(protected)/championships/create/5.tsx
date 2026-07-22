@@ -4,6 +4,7 @@ import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 
 import { championshipRoutes } from '@/constants/championshipRoutes';
+import { tokenRoutes } from '@/constants/tokenRoutes';
 import { theme } from '@/constants/theme';
 import { useAuth } from '@/features/auth';
 import {
@@ -86,7 +87,7 @@ export default function CreateStep5Screen() {
     }
 
     if (!isEditing && (balance ?? 0) < 1) {
-      router.push(championshipRoutes.noTokens as never);
+      router.push(tokenRoutes.noTokensWithReason('championship') as never);
       return;
     }
 
@@ -136,7 +137,7 @@ export default function CreateStep5Screen() {
           : 'Não foi possível salvar o campeonato.';
 
       if (message.includes('INSUFFICIENT_TOKENS')) {
-        router.push(championshipRoutes.noTokens as never);
+        router.push(tokenRoutes.noTokensWithReason('championship') as never);
         return;
       }
 

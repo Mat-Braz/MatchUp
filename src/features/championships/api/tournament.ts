@@ -110,6 +110,8 @@ export type AddMatchEventInput = {
 export type MatchSquadPlayer = {
   playerId: number;
   playerName: string;
+  yellowCards: number;
+  isExpelled: boolean;
 };
 
 export type MatchTeamSquad = {
@@ -168,9 +170,9 @@ const MATCH_TEAM_SQUADS_QUERY = `
   query MatchTeamSquads($matchId: Int!) {
     matchTeamSquads(matchId: $matchId) {
       teamId
-      activePlayers { playerId playerName }
-      benchPlayers { playerId playerName }
-      expelledPlayers { playerId playerName }
+      activePlayers { playerId playerName yellowCards isExpelled }
+      benchPlayers { playerId playerName yellowCards isExpelled }
+      expelledPlayers { playerId playerName yellowCards isExpelled }
       substitutionsUsed
       substitutionsLimit
     }

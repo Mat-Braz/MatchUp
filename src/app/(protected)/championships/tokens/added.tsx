@@ -1,21 +1,63 @@
+import { useMemo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import { championshipRoutes } from '@/constants/championshipRoutes';
+import { protectedProfileRoutes } from '@/constants/protectedProfileRoutes';
+import { type TokenFlowReason } from '@/constants/tokenRoutes';
 import { theme } from '@/constants/theme';
-import { useChampionshipWizard } from '@/features/championships';
 import { PrimaryButton } from '@/features/championships/components/WizardShell';
+
+function resolveReason(raw: string | string[] | undefined): TokenFlowReason {
+  const value = Array.isArray(raw) ? raw[0] : raw;
+  if (value === 'card' || value === 'championship' || value === 'general') {
+    return value;
+  }
+  return 'general';
+}
+
+function toNumber(raw: string | string[] | undefined): number {
+  const value = Array.isArray(raw) ? raw[0] : raw;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : 0;
+}
 
 export default function TokensAddedScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { lastPurchase } = useChampionshipWizard();
+  const params = useLocalSearchParams<{
+    reason?: string;
+    credited?: string;
+    balance?: string;
+  }>();
 
-  const credited = lastPurchase?.credited ?? 0;
-  const balance = lastPurchase?.balance ?? 0;
+  const reason = useMemo(() => resolveReason(params.reason), [params.reason]);
+  const credited = useMemo(() => toNumber(params.credited), [params.credited]);
+  const balance = useMemo(() => toNumber(params.balance), [params.balance]);
+
+  const primary = useMemo(() => {
+    if (reason === 'championship') {
+      return {
+        label: 'Continuar criando',
+        onPress: () =>
+          router.replace(championshipRoutes.createStep(5) as never),
+      };
+    }
+    if (reason === 'card') {
+      return {
+        label: 'Voltar para Minha Carta',
+        onPress: () =>
+          router.replace(protectedProfileRoutes.myCard as never),
+      };
+    }
+    return {
+      label: 'Continuar',
+      onPress: () => router.back(),
+    };
+  }, [reason, router]);
 
   return (
     <View style={[styles.root, { paddingTop: insets.top + 40, paddingBottom: insets.bottom + 24 }]}>
@@ -34,16 +76,20 @@ export default function TokensAddedScreen() {
         <Text style={styles.balance}>{balance} tokens</Text>
       </View>
 
-      <PrimaryButton
-        label="Continuar criando"
-        onPress={() => router.replace(championshipRoutes.createStep(5) as never)}
-      />
-      <Pressable
-        onPress={() => router.replace(championshipRoutes.create as never)}
-        style={styles.linkBtn}
-      >
-        <Text style={styles.link}>Voltar ao início do wizard</Text>
-      </Pressable>
+      <PrimaryButton label={primary.label} onPress={primary.onPress} />
+
+      {reason === 'championship' ? (
+        <Pressable
+          onPress={() => router.replace(championshipRoutes.create as never)}
+          style={styles.linkBtn}
+        >
+          <Text style={styles.link}>Voltar ao início do wizard</Text>
+        </Pressable>
+      ) : (
+        <Pressable onPress={() => router.back()} style={styles.linkBtn}>
+          <Text style={styles.link}>Voltar</Text>
+        </Pressable>
+      )}
     </View>
   );
 }

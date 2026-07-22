@@ -17,12 +17,9 @@ import { championshipRoutes } from '@/constants/championshipRoutes';
 import { theme } from '@/constants/theme';
 import { useAuth } from '@/features/auth';
 import {
-  eventTypeLabel,
   fetchMatchDetail,
   fetchMatchTeamSquads,
-  formatSubstitutionLabel,
   matchStatusLabel,
-  parseSubstitutionPlayerOut,
   startMatch,
   startPenalties,
   submitMatchResult,
@@ -30,6 +27,7 @@ import {
   rejectMatchResult,
   addMatchEvent,
   removeMatchEvent,
+  MatchEventsTimeline,
   SubstitutionModal,
   TeamShield,
   type MatchDetail,
@@ -106,10 +104,16 @@ export default function MatchScreen() {
     if (!match || selectedTeamId == null) {
       return [];
     }
-    return match.events.filter(
-      (event) =>
-        event.eventType === 'SUBSTITUICAO' && event.teamId === selectedTeamId,
-    );
+    return match.events
+      .filter(
+        (event) =>
+          event.eventType === 'SUBSTITUICAO' && event.teamId === selectedTeamId,
+      )
+      .slice()
+      .sort(
+        (a, b) =>
+          new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+      );
   }, [match, selectedTeamId]);
 
   const selectedTeamName = useMemo(() => {
@@ -128,18 +132,33 @@ export default function MatchScreen() {
       map.set(member.playerId, member.playerName);
     }
     for (const squad of teamSquads) {
-      for (const player of [...squad.activePlayers, ...squad.benchPlayers]) {
+      for (const player of [
+        ...squad.activePlayers,
+        ...squad.benchPlayers,
+        ...squad.expelledPlayers,
+      ]) {
         map.set(player.playerId, player.playerName);
       }
     }
     return map;
   }, [allMembers, teamSquads]);
 
+  const substitutionsRemaining =
+    selectedSquad?.substitutionsLimit == null
+      ? null
+      : Math.max(
+          0,
+          selectedSquad.substitutionsLimit - selectedSquad.substitutionsUsed,
+        );
+
+  const substitutionsExhausted =
+    selectedSquad?.substitutionsLimit != null &&
+    selectedSquad.substitutionsUsed >= selectedSquad.substitutionsLimit;
+
   const canOpenSubstitution =
     match?.phase !== 'PENALTIS' &&
     selectedSquad != null &&
-    (selectedSquad.substitutionsLimit == null ||
-      selectedSquad.substitutionsUsed < selectedSquad.substitutionsLimit) &&
+    !substitutionsExhausted &&
     selectedSquad.benchPlayers.length > 0 &&
     selectedSquad.activePlayers.length > 0;
 
@@ -251,6 +270,13 @@ export default function MatchScreen() {
         userId: needsPlayer ? selectedPlayerId : null,
         eventType,
       });
+      if (
+        eventType === 'CARTAO_AMARELO' ||
+        eventType === 'CARTAO_VERMELHO'
+      ) {
+        // Após expulsão (direta ou por 2 amarelos), limpa seleção do jogador.
+        setSelectedPlayerId(null);
+      }
     });
   }
 
@@ -422,31 +448,109 @@ export default function MatchScreen() {
                       ]}
                       onPress={() => setSelectedPlayerId(player.playerId)}
                     >
-                      <Text
-                        style={[
-                          styles.chipText,
-                          selectedPlayerId === player.playerId && styles.chipTextActive,
-                        ]}
-                      >
-                        {player.playerName}
-                      </Text>
+                      <View style={styles.chipWithCard}>
+                        <Text
+                          style={[
+                            styles.chipText,
+                            selectedPlayerId === player.playerId && styles.chipTextActive,
+                          ]}
+                        >
+                          {player.playerName}
+                        </Text>
+                        {player.yellowCards >= 1 ? (
+                          <View
+                            style={[
+                              styles.miniCard,
+                              { backgroundColor: '#F5C518', borderColor: '#F5C518' },
+                            ]}
+                          />
+                        ) : null}
+                      </View>
                     </Pressable>
+                  ))}
+                  {(selectedSquad?.expelledPlayers ?? []).map((player) => (
+                    <View
+                      key={`expelled-${player.playerId}`}
+                      style={[styles.chip, styles.chipExpelled]}
+                    >
+                      <View style={styles.chipWithCard}>
+                        <Text style={[styles.chipText, styles.chipTextExpelled]}>
+                          {player.playerName}
+                        </Text>
+                        <View
+                          style={[
+                            styles.miniCard,
+                            { backgroundColor: '#E53935', borderColor: '#E53935' },
+                          ]}
+                        />
+                      </View>
+                    </View>
                   ))}
                 </View>
 
                 {match.phase !== 'PENALTIS' ? (
-                  <Pressable
-                    style={[
-                      styles.secondaryBtn,
-                      (!canOpenSubstitution || loadingSubTeam) && styles.btnDisabled,
-                    ]}
-                    disabled={acting || !canOpenSubstitution || loadingSubTeam}
-                    onPress={() => void handleOpenSubstitution()}
-                  >
-                    <Text style={styles.secondaryBtnText}>
-                      {loadingSubTeam ? 'Carregando...' : 'Substituir jogador'}
-                    </Text>
-                  </Pressable>
+                  <>
+                    {selectedSquad?.substitutionsLimit != null ? (
+                      <Text
+                        style={[
+                          styles.hint,
+                          substitutionsExhausted && styles.substitutionsLimitReached,
+                        ]}
+                      >
+                        Substituições deste time: {selectedSquad.substitutionsUsed}/
+                        {selectedSquad.substitutionsLimit}
+                        {substitutionsExhausted
+                          ? ' — limite atingido'
+                          : substitutionsRemaining != null
+                            ? ` (${substitutionsRemaining} restante${
+                                substitutionsRemaining === 1 ? '' : 's'
+                              })`
+                            : ''}
+                      </Text>
+                    ) : (
+                      <Text style={styles.hint}>
+                        Substituições: sem limite definido neste campeonato
+                      </Text>
+                    )}
+                    {teamSquads.length === 2 &&
+                    teamSquads[0]?.substitutionsLimit != null ? (
+                      <Text style={styles.hint}>
+                        {match.game.homeTeam?.sigla ??
+                          match.game.homeTeam?.name ??
+                          'Casa'}
+                        :{' '}
+                        {teamSquads.find(
+                          (s) => s.teamId === match.game.homeTeam?.id,
+                        )?.substitutionsUsed ?? 0}
+                        /{teamSquads[0].substitutionsLimit}
+                        {'  ·  '}
+                        {match.game.awayTeam?.sigla ??
+                          match.game.awayTeam?.name ??
+                          'Fora'}
+                        :{' '}
+                        {teamSquads.find(
+                          (s) => s.teamId === match.game.awayTeam?.id,
+                        )?.substitutionsUsed ?? 0}
+                        /{teamSquads[0].substitutionsLimit}
+                      </Text>
+                    ) : null}
+                    <Pressable
+                      style={[
+                        styles.secondaryBtn,
+                        (!canOpenSubstitution || loadingSubTeam) && styles.btnDisabled,
+                      ]}
+                      disabled={acting || !canOpenSubstitution || loadingSubTeam}
+                      onPress={() => void handleOpenSubstitution()}
+                    >
+                      <Text style={styles.secondaryBtnText}>
+                        {loadingSubTeam
+                          ? 'Carregando...'
+                          : substitutionsExhausted
+                            ? 'Limite de substituições atingido'
+                            : 'Substituir jogador'}
+                      </Text>
+                    </Pressable>
+                  </>
                 ) : null}
 
                 <View style={styles.rowWrap}>
@@ -539,51 +643,18 @@ export default function MatchScreen() {
 
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Eventos</Text>
-              {match.events.length === 0 ? (
-                <Text style={styles.hint}>Nenhum evento registrado.</Text>
-              ) : (
-                match.events.map((event) => {
-                  const playerOutId =
-                    event.eventType === 'SUBSTITUICAO'
-                      ? parseSubstitutionPlayerOut(event.note)
-                      : null;
-                  const eventLabel =
-                    event.eventType === 'SUBSTITUICAO'
-                      ? formatSubstitutionLabel(
-                          event.user?.name ?? playerNameById.get(event.userId ?? -1),
-                          playerOutId != null
-                            ? playerNameById.get(playerOutId)
-                            : undefined,
-                        )
-                      : event.user
-                        ? `${eventTypeLabel(event.eventType)} — ${event.user.name}`
-                        : eventTypeLabel(event.eventType);
-
-                  return (
-                  <View key={event.id} style={styles.eventRow}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.eventTitle}>{eventLabel}</Text>
-                      <Text style={styles.hint}>{event.team.name}</Text>
-                    </View>
-                    {canEditEvents ? (
-                      <Pressable
-                        onPress={() =>
-                          void runAction(async () => {
-                            await removeMatchEvent(token!, event.id);
-                          })
-                        }
-                      >
-                        <Ionicons
-                          name="trash-outline"
-                          size={18}
-                          color={theme.colors.dangerSoft}
-                        />
-                      </Pressable>
-                    ) : null}
-                  </View>
-                  );
-                })
-              )}
+              <MatchEventsTimeline
+                events={match.events}
+                homeTeamId={match.game.homeTeam?.id ?? null}
+                awayTeamId={match.game.awayTeam?.id ?? null}
+                playerNameById={playerNameById}
+                canDelete={canEditEvents}
+                onDelete={(eventId) =>
+                  void runAction(async () => {
+                    await removeMatchEvent(token!, eventId);
+                  })
+                }
+              />
             </View>
 
             {!Number.isFinite(championshipId) ? null : (
@@ -688,6 +759,10 @@ const styles = StyleSheet.create({
     fontWeight: theme.fontWeights.bold,
   },
   hint: { color: theme.colors.textMuted, fontSize: 13 },
+  substitutionsLimitReached: {
+    color: theme.colors.dangerSoft,
+    fontWeight: theme.fontWeights.semibold,
+  },
   expelledHint: {
     color: theme.colors.dangerSoft,
     fontSize: 12,
@@ -707,6 +782,22 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.primary,
     borderColor: theme.colors.primary,
   },
+  chipExpelled: {
+    opacity: 0.55,
+    borderColor: '#E53935',
+  },
+  chipWithCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  miniCard: {
+    width: 9,
+    height: 12,
+    borderRadius: 2,
+    borderWidth: 1,
+    transform: [{ rotate: '12deg' }],
+  },
   btnDisabled: { opacity: 0.5 },
   chipText: {
     color: theme.colors.text,
@@ -714,6 +805,7 @@ const styles = StyleSheet.create({
     fontWeight: theme.fontWeights.bold,
   },
   chipTextActive: { color: theme.colors.black },
+  chipTextExpelled: { color: theme.colors.textMuted },
   eventBtn: {
     paddingHorizontal: 12,
     paddingVertical: 10,
@@ -763,18 +855,6 @@ const styles = StyleSheet.create({
   dangerBtnText: {
     color: theme.colors.dangerSoft,
     fontWeight: theme.fontWeights.bold,
-  },
-  eventRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border,
-  },
-  eventTitle: {
-    color: theme.colors.text,
-    fontWeight: theme.fontWeights.semibold,
   },
   link: {
     color: theme.colors.primarySoft,
