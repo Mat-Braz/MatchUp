@@ -1,9 +1,20 @@
-import { Image, ImageSourcePropType, Pressable, StyleSheet, Text, View } from 'react-native';
+import {
+  Image,
+  ImageSourcePropType,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+  useWindowDimensions,
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, type Href } from 'expo-router';
 
 import { PencilScreen } from '@/features/auth';
+import { useNotificationBadge } from '@/features/notifications';
 import { theme } from '@/constants/theme';
 
 const fullLogo = require('../../../assets/images/RgTnC.png') as ImageSourcePropType;
@@ -31,7 +42,7 @@ const navIcons = {
   },
 } as const;
 
-type TabName = 'Início' | 'Explorar' | 'Chat' | 'Notificações' | 'Perfil';
+type TabName = 'Início' | 'Explorar' | 'Times' | 'Chat' | 'Notificações' | 'Perfil';
 type NavIconName = keyof typeof navIcons;
 
 export function ProtectedCanvas({
@@ -45,13 +56,24 @@ export function ProtectedCanvas({
   scroll?: boolean;
   canvasHeight?: number;
 }) {
-  const navTop = canvasHeight - 105;
+  const insets = useSafeAreaInsets();
 
   return (
-    <PencilScreen scroll={scroll} canvasHeight={canvasHeight}>
-      {children}
-      <BottomNav active={active} top={navTop} />
-    </PencilScreen>
+    <View style={styles.protectedRoot}>
+      <View style={styles.protectedContent}>
+        <PencilScreen scroll={scroll} canvasHeight={canvasHeight}>
+          {children}
+        </PencilScreen>
+      </View>
+      <View
+        style={[
+          styles.fixedNavBar,
+          { paddingBottom: Math.max(insets.bottom, 10) },
+        ]}
+      >
+        <BottomNav active={active} />
+      </View>
+    </View>
   );
 }
 
@@ -77,11 +99,51 @@ export function ScreenTitle({ children, action }: { children: string; action?: s
   );
 }
 
-export function SearchBox({ placeholder }: { placeholder: string }) {
+export function SearchBox({
+  placeholder,
+  value,
+  onChangeText,
+  onFilterPress,
+  showFilter = false,
+}: {
+  placeholder: string;
+  value?: string;
+  onChangeText?: (text: string) => void;
+  onFilterPress?: () => void;
+  showFilter?: boolean;
+}) {
+  const interactive = onChangeText != null;
+
   return (
-    <View style={styles.searchBox}>
-      <Image source={navIcons.search.inactive} style={styles.searchIconImage} resizeMode="contain" />
-      <Text style={styles.searchPlaceholder}>{placeholder}</Text>
+    <View style={[styles.searchRow, showFilter && styles.searchRowWithFilter]}>
+      <View style={[styles.searchBox, showFilter && styles.searchBoxCompact]}>
+        <Image
+          source={navIcons.search.inactive}
+          style={styles.searchIconImage}
+          resizeMode="contain"
+        />
+        {interactive ? (
+          <TextInput
+            style={styles.searchInput}
+            placeholder={placeholder}
+            placeholderTextColor="#80808A"
+            value={value}
+            onChangeText={onChangeText}
+            returnKeyType="search"
+          />
+        ) : (
+          <Text style={styles.searchPlaceholder}>{placeholder}</Text>
+        )}
+      </View>
+      {showFilter ? (
+        <Pressable
+          style={styles.filterButton}
+          onPress={onFilterPress}
+          hitSlop={8}
+        >
+          <Ionicons name="options-outline" size={20} color={theme.colors.text} />
+        </Pressable>
+      ) : null}
     </View>
   );
 }
@@ -98,14 +160,32 @@ export function EmptyState({ top, title, message }: { top: number; title: string
   );
 }
 
-export function Chips({ items, top }: { items: string[]; top: number }) {
+export function Chips({
+  items,
+  top,
+  selectedIndex = 0,
+  onSelect,
+}: {
+  items: string[];
+  top: number;
+  selectedIndex?: number;
+  onSelect?: (index: number) => void;
+}) {
   return (
     <View style={[styles.chips, { top }]}>
-      {items.map((item, index) => (
-        <View key={item} style={[styles.chip, index === 0 && styles.chipActive]}>
-          <Text style={[styles.chipText, index === 0 && styles.chipTextActive]}>{item}</Text>
-        </View>
-      ))}
+      {items.map((item, index) => {
+        const active = index === selectedIndex;
+        return (
+          <Pressable
+            key={item}
+            disabled={!onSelect}
+            style={[styles.chip, active && styles.chipActive]}
+            onPress={() => onSelect?.(index)}
+          >
+            <Text style={[styles.chipText, active && styles.chipTextActive]}>{item}</Text>
+          </Pressable>
+        );
+      })}
     </View>
   );
 }
@@ -118,17 +198,30 @@ export function ChampionshipCard({
   dates,
   teams = '0 times',
   actionLabel,
+  onPress,
 }: {
-  top: number;
+  /** Absolute Y when laid out on the Pencil canvas; omit for in-flow ScrollView lists. */
+  top?: number;
   title: string;
   status?: string;
   year?: string;
   dates?: string;
   teams?: string;
   actionLabel?: string;
+  onPress?: () => void;
 }) {
   return (
-    <View style={[styles.champCard, { top }]}>
+    <Pressable
+      onPress={onPress}
+      disabled={!onPress}
+      style={({ pressed }) => [
+        styles.champCard,
+        top != null
+          ? { position: 'absolute', left: 24, top }
+          : styles.champCardInFlow,
+        pressed && onPress ? { opacity: 0.9 } : null,
+      ]}
+    >
       <View style={styles.cardHeader}>
         <Text style={styles.cardTitle} numberOfLines={1}>
           {title}
@@ -145,7 +238,7 @@ export function ChampionshipCard({
           </View>
         ) : null}
       </View>
-    </View>
+    </Pressable>
   );
 }
 
@@ -278,24 +371,63 @@ export function ProfileMenu({
   );
 }
 
-function BottomNav({ active, top = 739 }: { active: TabName; top?: number }) {
+function BottomNav({ active }: { active: TabName }) {
   const router = useRouter();
-  const tabs: { label: TabName; icon: NavIconName; route: Href }[] = [
+  const { width } = useWindowDimensions();
+  const { hasUnread } = useNotificationBadge();
+  const tabs: {
+    label: TabName;
+    icon?: NavIconName;
+    ionicon?: keyof typeof Ionicons.glyphMap;
+    route: Href;
+  }[] = [
     { label: 'Início', icon: 'home', route: '/(protected)/(tabs)/home' as Href },
     { label: 'Explorar', icon: 'search', route: '/(protected)/(tabs)/explore' as Href },
+    {
+      label: 'Times',
+      ionicon: 'shield-outline',
+      route: '/(protected)/(tabs)/teams' as Href,
+    },
     { label: 'Chat', icon: 'chat', route: '/(protected)/(tabs)/contacts' as Href },
-    { label: 'Notificações', icon: 'bell', route: '/(protected)/(tabs)/notifications' as Href },
+    {
+      label: 'Notificações',
+      icon: 'bell',
+      route: '/(protected)/(tabs)/notifications' as Href,
+    },
     { label: 'Perfil', icon: 'user', route: '/(protected)/(tabs)/profile' as Href },
   ];
 
   return (
-    <View style={[styles.bottomNav, { top }]}>
+    <View style={[styles.bottomNav, { width: Math.min(width - 20, 370) }]}>
       {tabs.map((tab) => {
         const isActive = active === tab.label;
         return (
-          <Pressable key={tab.label} style={[styles.navItem, isActive && styles.navItemActive]} onPress={() => router.push(tab.route)}>
-            <Image source={navIcons[tab.icon][isActive ? 'active' : 'inactive']} style={styles.navIconImage} resizeMode="contain" />
-            <Text style={[styles.navLabel, isActive && styles.navActive]}>{tab.label}</Text>
+          <Pressable
+            key={tab.label}
+            style={[styles.navItem, isActive && styles.navItemActive]}
+            onPress={() => router.push(tab.route)}
+          >
+            <View style={styles.navIconWrap}>
+              {tab.ionicon ? (
+                <Ionicons
+                  name={tab.ionicon}
+                  size={20}
+                  color={isActive ? theme.colors.primary : '#80808A'}
+                />
+              ) : tab.icon ? (
+                <Image
+                  source={navIcons[tab.icon][isActive ? 'active' : 'inactive']}
+                  style={styles.navIconImage}
+                  resizeMode="contain"
+                />
+              ) : null}
+              {tab.label === 'Notificações' && hasUnread ? (
+                <View style={styles.navBadgeDot} />
+              ) : null}
+            </View>
+            <Text style={[styles.navLabel, isActive && styles.navActive]} numberOfLines={1}>
+              {tab.label}
+            </Text>
           </Pressable>
         );
       })}
@@ -304,6 +436,22 @@ function BottomNav({ active, top = 739 }: { active: TabName; top?: number }) {
 }
 
 const styles = StyleSheet.create({
+  protectedRoot: {
+    flex: 1,
+    backgroundColor: theme.colors.background,
+  },
+  protectedContent: {
+    flex: 1,
+  },
+  fixedNavBar: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    alignItems: 'center',
+    backgroundColor: 'transparent',
+    pointerEvents: 'box-none',
+  },
   logoWrap: {
     position: 'absolute',
     left: 24,
@@ -353,10 +501,7 @@ const styles = StyleSheet.create({
     lineHeight: 32,
   },
   searchBox: {
-    position: 'absolute',
-    left: 24,
-    top: 115,
-    width: 342,
+    flex: 1,
     height: 40,
     flexDirection: 'row',
     alignItems: 'center',
@@ -364,6 +509,38 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     backgroundColor: theme.colors.surfaceCard,
     paddingHorizontal: 14,
+  },
+  searchRow: {
+    position: 'absolute',
+    left: 24,
+    top: 115,
+    width: 342,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  searchRowWithFilter: {
+    width: 342,
+  },
+  searchBoxCompact: {
+    flex: 1,
+  },
+  filterButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 8,
+    backgroundColor: theme.colors.surfaceCard,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  searchInput: {
+    flex: 1,
+    color: theme.colors.text,
+    fontSize: 14,
+    fontWeight: '600',
+    paddingVertical: 0,
   },
   searchPlaceholder: {
     color: '#80808A',
@@ -418,6 +595,7 @@ const styles = StyleSheet.create({
     left: 24,
     width: 342,
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 8,
   },
   chip: {
@@ -439,13 +617,17 @@ const styles = StyleSheet.create({
     color: theme.colors.black,
   },
   champCard: {
-    position: 'absolute',
-    left: 24,
     width: 342,
     height: 150,
     borderRadius: 16,
     backgroundColor: theme.colors.surfaceCard,
     padding: 18,
+  },
+  champCardInFlow: {
+    position: 'relative',
+    left: 0,
+    width: '100%',
+    marginBottom: 12,
   },
   cardHeader: {
     flexDirection: 'row',
@@ -728,20 +910,17 @@ const styles = StyleSheet.create({
     color: theme.colors.dangerSoft,
   },
   bottomNav: {
-    position: 'absolute',
-    left: 16,
-    top: 739,
-    width: 358,
     height: 78,
     flexDirection: 'row',
-    gap: 8,
+    gap: 2,
     justifyContent: 'space-between',
     alignItems: 'center',
     borderRadius: 16,
     borderWidth: 1,
     borderColor: theme.colors.border,
     backgroundColor: theme.colors.surfaceLow,
-    padding: 10,
+    paddingHorizontal: 4,
+    paddingVertical: 8,
   },
   navItem: {
     flex: 1,
@@ -749,7 +928,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 8,
-    gap: 4,
+    gap: 2,
+    paddingHorizontal: 2,
   },
   navItemActive: {
     backgroundColor: theme.colors.surfaceHigh,
@@ -758,11 +938,28 @@ const styles = StyleSheet.create({
     width: 20,
     height: 20,
   },
+  navIconWrap: {
+    width: 24,
+    height: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  navBadgeDot: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: theme.colors.primary,
+    borderWidth: 1,
+    borderColor: theme.colors.surfaceLow,
+  },
   navLabel: {
     color: theme.colors.textDim,
-    fontSize: 11,
+    fontSize: 9,
     fontWeight: theme.fontWeights.extraBold,
-    lineHeight: 15,
+    lineHeight: 12,
   },
   navActive: {
     color: theme.colors.primary,

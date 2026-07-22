@@ -14,6 +14,7 @@ export type RegisterDraft = {
   name: string;
   email: string;
   password: string;
+  cpf: string;
   birthDate: string;
   phone: string;
   cep: string;
@@ -28,6 +29,7 @@ type AccessDataInput = {
 };
 
 type PersonalDataInput = {
+  cpf: string;
   birthDate: string;
   phone: string;
   cep: string;
@@ -49,6 +51,7 @@ const emptyDraft: RegisterDraft = {
   name: '',
   email: '',
   password: '',
+  cpf: '',
   birthDate: '',
   phone: '',
   cep: '',
@@ -77,6 +80,7 @@ export function RegisterProvider({ children }: PropsWithChildren) {
   const setPersonalData = useCallback((data: PersonalDataInput) => {
     setDraft((current) => ({
       ...current,
+      cpf: data.cpf,
       birthDate: data.birthDate,
       phone: data.phone,
       cep: data.cep,
@@ -94,6 +98,7 @@ export function RegisterProvider({ children }: PropsWithChildren) {
       draft.name &&
       draft.email &&
       draft.password &&
+      draft.cpf &&
       draft.birthDate &&
       draft.phone &&
       draft.cep &&

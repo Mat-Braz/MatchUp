@@ -6,6 +6,12 @@ export type MyChampionshipsScope = 'ALL' | 'PARTICIPATING' | 'CREATED';
 
 export type MyChampionshipRelation = 'PARTICIPATING' | 'CREATED';
 
+export type ChampionshipType =
+  | 'ELIMINATORIA'
+  | 'PONTOS_CORRIDOS'
+  | 'X1'
+  | 'GRUPOS_MATA_MATA';
+
 export type Championship = {
   id: number;
   name: string;
@@ -16,8 +22,286 @@ export type Championship = {
   startsAt: string | null;
   endsAt: string | null;
   teamsCount: number;
-  responsibleTeamId: number;
+  responsibleUserId: number;
 };
+
+export type CreateChampionshipInput = {
+  name: string;
+  description?: string;
+  city?: string;
+  uf?: string;
+  championshipType: ChampionshipType;
+  maxParticipants?: number;
+  hasTrophy?: boolean;
+  hasMedal?: boolean;
+  hasCashPrize?: boolean;
+  prizeFirst?: number;
+  prizeSecond?: number;
+  prizeThird?: number;
+  rulesEnabled?: boolean;
+  yellowCardLimit?: number;
+  redCardLimit?: number;
+  substitutions?: number;
+  isPublic?: boolean;
+};
+
+export type UpdateChampionshipInput = Partial<CreateChampionshipInput> & {
+  status?: ChampionshipStatus;
+  finished?: boolean;
+};
+
+export type ChampionshipDetails = Championship & {
+  description: string | null;
+  city: string | null;
+  uf: string | null;
+  maxParticipants: number | null;
+  hasTrophy: boolean;
+  hasMedal: boolean;
+  hasCashPrize: boolean;
+  prizeFirst: number | null;
+  prizeSecond: number | null;
+  prizeThird: number | null;
+  rulesEnabled: boolean;
+  yellowCardLimit: number | null;
+  redCardLimit: number | null;
+  substitutions: number | null;
+};
+
+export type ChampionshipTeamItem = {
+  id: number;
+  name: string;
+  sigla: string | null;
+  shieldUrl: string | null;
+  createdByUserId: number;
+};
+
+export type TeamSearchItem = {
+  id: number;
+  name: string;
+  sigla: string | null;
+  shieldUrl: string | null;
+  createdByUserId: number;
+};
+
+const CREATE_CHAMPIONSHIP_MUTATION = `
+  mutation CreateChampionship($input: CreateChampionshipInput!) {
+    createChampionship(input: $input) {
+      id
+      name
+      championshipType
+      status
+      isPublic
+      maxParticipants
+      city
+      uf
+    }
+  }
+`;
+
+export async function createChampionship(
+  token: string,
+  input: CreateChampionshipInput,
+): Promise<{ id: number; name: string }> {
+  const data = await graphqlRequest<
+    { createChampionship: { id: number; name: string } },
+    { input: CreateChampionshipInput }
+  >(CREATE_CHAMPIONSHIP_MUTATION, { input }, token);
+  return data.createChampionship;
+}
+
+const CHAMPIONSHIP_DETAIL_FIELDS = `
+  id
+  name
+  description
+  city
+  uf
+  championshipType
+  status
+  finished
+  isPublic
+  startsAt
+  endsAt
+  teamsCount
+  responsibleUserId
+  maxParticipants
+  hasTrophy
+  hasMedal
+  hasCashPrize
+  prizeFirst
+  prizeSecond
+  prizeThird
+  rulesEnabled
+  yellowCardLimit
+  redCardLimit
+  substitutions
+`;
+
+const CHAMPIONSHIP_QUERY = `
+  query Championship($id: Int!) {
+    championship(id: $id) {
+      ${CHAMPIONSHIP_DETAIL_FIELDS}
+    }
+  }
+`;
+
+const UPDATE_CHAMPIONSHIP_MUTATION = `
+  mutation UpdateChampionship($id: Int!, $input: UpdateChampionshipInput!) {
+    updateChampionship(id: $id, input: $input) {
+      id
+      name
+    }
+  }
+`;
+
+const REMOVE_CHAMPIONSHIP_MUTATION = `
+  mutation RemoveChampionship($id: Int!) {
+    removeChampionship(id: $id) {
+      id
+    }
+  }
+`;
+
+const INVITE_TEAM_MUTATION = `
+  mutation InviteTeamToChampionship($championshipId: Int!, $teamId: Int!) {
+    inviteTeamToChampionship(championshipId: $championshipId, teamId: $teamId) {
+      id
+      status
+    }
+  }
+`;
+
+const REQUEST_JOIN_MUTATION = `
+  mutation RequestJoinChampionship($championshipId: Int!, $teamId: Int!) {
+    requestJoinChampionship(championshipId: $championshipId, teamId: $teamId) {
+      id
+      status
+    }
+  }
+`;
+
+const CHAMPIONSHIP_TEAMS_QUERY = `
+  query ChampionshipTeams($championshipId: Int!) {
+    championshipTeams(championshipId: $championshipId) {
+      id
+      name
+      sigla
+      shieldUrl
+      createdByUserId
+    }
+  }
+`;
+
+const SEARCH_TEAMS_QUERY = `
+  query SearchTeams($filters: TeamFilterInput) {
+    teams(filters: $filters) {
+      id
+      name
+      sigla
+      shieldUrl
+      createdByUserId
+    }
+  }
+`;
+
+export async function fetchChampionship(
+  token: string,
+  id: number,
+): Promise<ChampionshipDetails> {
+  const data = await graphqlRequest<
+    { championship: ChampionshipDetails },
+    { id: number }
+  >(CHAMPIONSHIP_QUERY, { id }, token);
+  return data.championship;
+}
+
+export async function updateChampionship(
+  token: string,
+  id: number,
+  input: UpdateChampionshipInput,
+): Promise<void> {
+  await graphqlRequest(UPDATE_CHAMPIONSHIP_MUTATION, { id, input }, token);
+}
+
+export async function removeChampionship(token: string, id: number): Promise<void> {
+  await graphqlRequest(REMOVE_CHAMPIONSHIP_MUTATION, { id }, token);
+}
+
+export async function inviteTeamToChampionship(
+  token: string,
+  championshipId: number,
+  teamId: number,
+): Promise<void> {
+  await graphqlRequest(INVITE_TEAM_MUTATION, { championshipId, teamId }, token);
+}
+
+export async function requestJoinChampionship(
+  token: string,
+  championshipId: number,
+  teamId: number,
+): Promise<void> {
+  await graphqlRequest(REQUEST_JOIN_MUTATION, { championshipId, teamId }, token);
+}
+
+export async function fetchChampionshipTeams(
+  token: string,
+  championshipId: number,
+): Promise<ChampionshipTeamItem[]> {
+  const data = await graphqlRequest<
+    { championshipTeams: ChampionshipTeamItem[] },
+    { championshipId: number }
+  >(CHAMPIONSHIP_TEAMS_QUERY, { championshipId }, token);
+  return data.championshipTeams;
+}
+
+export async function searchTeams(
+  token: string,
+  name: string,
+): Promise<TeamSearchItem[]> {
+  const trimmed = name.trim();
+  if (trimmed.length < 2) {
+    return [];
+  }
+  const data = await graphqlRequest<
+    { teams: TeamSearchItem[] },
+    { filters: { name: string } }
+  >(SEARCH_TEAMS_QUERY, { filters: { name: trimmed } }, token);
+  return data.teams;
+}
+
+const PENDING_JOIN_TEAM_IDS_QUERY = `
+  query PendingChampionshipJoinTeamIds($championshipId: Int!) {
+    pendingChampionshipJoinTeamIds(championshipId: $championshipId)
+  }
+`;
+
+const PENDING_INVITE_TEAM_IDS_QUERY = `
+  query PendingChampionshipInviteTeamIds($championshipId: Int!) {
+    pendingChampionshipInviteTeamIds(championshipId: $championshipId)
+  }
+`;
+
+export async function fetchPendingChampionshipJoinTeamIds(
+  token: string,
+  championshipId: number,
+): Promise<number[]> {
+  const data = await graphqlRequest<
+    { pendingChampionshipJoinTeamIds: number[] },
+    { championshipId: number }
+  >(PENDING_JOIN_TEAM_IDS_QUERY, { championshipId }, token);
+  return data.pendingChampionshipJoinTeamIds;
+}
+
+export async function fetchPendingChampionshipInviteTeamIds(
+  token: string,
+  championshipId: number,
+): Promise<number[]> {
+  const data = await graphqlRequest<
+    { pendingChampionshipInviteTeamIds: number[] },
+    { championshipId: number }
+  >(PENDING_INVITE_TEAM_IDS_QUERY, { championshipId }, token);
+  return data.pendingChampionshipInviteTeamIds;
+}
+
 
 export type MyChampionshipItem = {
   id: number;
@@ -38,7 +322,7 @@ const CHAMPIONSHIP_FIELDS = `
   startsAt
   endsAt
   teamsCount
-  responsibleTeamId
+  responsibleUserId
 `;
 
 const RECOMMENDED_CHAMPIONSHIPS_QUERY = `
@@ -70,6 +354,25 @@ const MY_PROFILE_CHAMPIONSHIPS_QUERY = `
   }
 `;
 
+const MY_PROFILE_CHAMPIONSHIPS_PAGE_QUERY = `
+  query MyProfileChampionshipsPage($input: MyProfileChampionshipsPageInput) {
+    myProfileChampionshipsPage(input: $input) {
+      items {
+        id
+        name
+        status
+        relation
+        createdByMe
+        participating
+      }
+      totalCount
+      page
+      pageSize
+      totalPages
+    }
+  }
+`;
+
 export async function fetchRecommendedChampionships(token: string): Promise<Championship[]> {
   const data = await graphqlRequest<{ recommendedChampionships: Championship[] }>(
     RECOMMENDED_CHAMPIONSHIPS_QUERY,
@@ -97,6 +400,74 @@ export async function fetchMyProfileChampionships(
     { scope: MyChampionshipsScope }
   >(MY_PROFILE_CHAMPIONSHIPS_QUERY, { scope }, token);
   return data.myProfileChampionships;
+}
+
+export type MyProfileChampionshipsPageInput = {
+  scope?: MyChampionshipsScope;
+  page?: number;
+  pageSize?: number;
+};
+
+export type MyProfileChampionshipsPageResult = {
+  items: MyChampionshipItem[];
+  totalCount: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+};
+
+export async function fetchMyProfileChampionshipsPage(
+  token: string,
+  input: MyProfileChampionshipsPageInput = {},
+): Promise<MyProfileChampionshipsPageResult> {
+  const data = await graphqlRequest<
+    { myProfileChampionshipsPage: MyProfileChampionshipsPageResult },
+    { input: MyProfileChampionshipsPageInput }
+  >(MY_PROFILE_CHAMPIONSHIPS_PAGE_QUERY, { input }, token);
+  return data.myProfileChampionshipsPage;
+}
+
+export type ExploreChampionshipsInput = {
+  name?: string;
+  city?: string;
+  uf?: string;
+  championshipType?: ChampionshipType;
+  status?: ChampionshipStatus;
+  page?: number;
+  pageSize?: number;
+};
+
+export type ExploreChampionshipsResult = {
+  items: Championship[];
+  totalCount: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+};
+
+const EXPLORE_PUBLIC_CHAMPIONSHIPS_QUERY = `
+  query ExplorePublicChampionships($input: ExploreChampionshipsInput!) {
+    explorePublicChampionships(input: $input) {
+      items {
+        ${CHAMPIONSHIP_FIELDS}
+      }
+      totalCount
+      page
+      pageSize
+      totalPages
+    }
+  }
+`;
+
+export async function fetchExplorePublicChampionships(
+  token: string,
+  input: ExploreChampionshipsInput,
+): Promise<ExploreChampionshipsResult> {
+  const data = await graphqlRequest<
+    { explorePublicChampionships: ExploreChampionshipsResult },
+    { input: ExploreChampionshipsInput }
+  >(EXPLORE_PUBLIC_CHAMPIONSHIPS_QUERY, { input }, token);
+  return data.explorePublicChampionships;
 }
 
 export function championshipStatusLabel(status: ChampionshipStatus): string {

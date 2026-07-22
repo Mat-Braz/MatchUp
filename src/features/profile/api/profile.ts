@@ -4,12 +4,15 @@ export type MeUser = {
   id: number;
   name: string;
   email: string;
+  cpf: string | null;
+  tokenBalance: number;
   avatarUrl: string | null;
   birthDate: string | null;
   phone: string | null;
   cep: string | null;
   city: string | null;
   uf: string | null;
+  activeTeamId: number | null;
 };
 
 export type UpdateMyProfileInput = {
@@ -26,12 +29,15 @@ const ME_FIELDS = `
   id
   name
   email
+  cpf
+  tokenBalance
   avatarUrl
   birthDate
   phone
   cep
   city
   uf
+  activeTeamId
 `;
 
 const ME_QUERY = `
@@ -71,13 +77,22 @@ export async function updateMyAvatar(token: string, avatarUrl: string): Promise<
   return updateMyProfile(token, { avatarUrl });
 }
 
-export function formatProfileSubtitle(user: Pick<MeUser, 'city' | 'uf'>): string {
+export function formatProfileSubtitle(
+  user: Pick<MeUser, 'city' | 'uf' | 'tokenBalance'>,
+): string {
   const location =
     user.city && user.uf
       ? `${user.city}, ${user.uf.toUpperCase()}`
       : user.city || (user.uf ? user.uf.toUpperCase() : null);
 
-  return location ? `Pessoa / Atleta • ${location}` : 'Pessoa / Atleta';
+  const tokens =
+    typeof user.tokenBalance === 'number'
+      ? ` • ${user.tokenBalance} token${user.tokenBalance === 1 ? '' : 's'}`
+      : '';
+
+  return location
+    ? `Pessoa / Atleta • ${location}${tokens}`
+    : `Pessoa / Atleta${tokens}`;
 }
 
 /** Converte ISO date da API para dd/mm/yyyy */

@@ -5,15 +5,16 @@ export type PlayerChampionshipStats = {
   name: string;
   games: number;
   goals: number;
-  assists: number;
+  yellowCards: number;
+  redCards: number;
 };
 
 export type PlayerStats = {
   games: number;
   wins: number;
   goals: number;
-  assists: number;
-  cards: number;
+  yellowCards: number;
+  redCards: number;
   recentChampionships: PlayerChampionshipStats[];
 };
 
@@ -23,14 +24,15 @@ const MY_PLAYER_STATS_QUERY = `
       games
       wins
       goals
-      assists
-      cards
+      yellowCards
+      redCards
       recentChampionships {
         id
         name
         games
         goals
-        assists
+        yellowCards
+        redCards
       }
     }
   }
@@ -48,8 +50,10 @@ export async function fetchMyPlayerStats(token: string): Promise<PlayerStats> {
 export function formatChampionshipMeta(item: PlayerChampionshipStats): string {
   const gamesLabel = item.games === 1 ? '1 jogo' : `${item.games} jogos`;
   const goalsLabel = item.goals === 1 ? '1 gol' : `${item.goals} gols`;
-  const assistsLabel =
-    item.assists === 1 ? '1 assistência' : `${item.assists} assistências`;
+  const yellowLabel =
+    item.yellowCards === 1 ? '1 amarelo' : `${item.yellowCards} amarelos`;
+  const redLabel =
+    item.redCards === 1 ? '1 vermelho' : `${item.redCards} vermelhos`;
 
-  return `${gamesLabel} • ${goalsLabel} • ${assistsLabel}`;
+  return `${gamesLabel} • ${goalsLabel} • ${yellowLabel} • ${redLabel}`;
 }

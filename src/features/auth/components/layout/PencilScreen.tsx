@@ -10,6 +10,7 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { useEffect, useRef, useState } from 'react';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { theme } from '@/constants/theme';
 
@@ -29,6 +30,7 @@ export function PencilScreen({
   canvasHeight = 844,
 }: PencilScreenProps) {
   const { width, height } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
   const scrollViewRef = useRef<ScrollView>(null);
   const [keyboardVisible, setKeyboardVisible] = useState(false);
   const usesScrollView = scroll || keyboardScroll;
@@ -66,7 +68,10 @@ export function PencilScreen({
           style={styles.scroll}
           scrollEnabled={scroll && !keyboardScroll ? true : keyboardVisible}
           bounces={scroll && !keyboardScroll ? true : keyboardVisible}
-          contentContainerStyle={[styles.scrollContent, { minHeight: height }]}
+          contentContainerStyle={[
+            styles.scrollContent,
+            { minHeight: height, paddingBottom: Math.max(insets.bottom, 16) },
+          ]}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >

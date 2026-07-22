@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, type ComponentProps } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -24,10 +24,44 @@ const EMPTY_STATS: PlayerStats = {
   games: 0,
   wins: 0,
   goals: 0,
-  assists: 0,
-  cards: 0,
+  yellowCards: 0,
+  redCards: 0,
   recentChampionships: [],
 };
+
+type StatIconName = ComponentProps<typeof Ionicons>['name'];
+
+function StatCard({
+  style,
+  value,
+  label,
+  icon,
+  iconColor,
+  large,
+}: {
+  style: object;
+  value: number;
+  label: string;
+  icon: StatIconName;
+  iconColor: string;
+  large?: boolean;
+}) {
+  return (
+    <View style={[styles.statCard, style]}>
+      <View style={[styles.statIconWrap, { backgroundColor: `${iconColor}22` }]}>
+        <Ionicons name={icon} size={large ? 22 : 18} color={iconColor} />
+      </View>
+      <Text style={large ? styles.statValue : styles.statValueSmall}>{value}</Text>
+      <Text style={styles.statLabel}>{label}</Text>
+    </View>
+  );
+}
+
+function CardBadge({ color }: { color: string }) {
+  return (
+    <View style={[styles.cardBadge, { backgroundColor: color, borderColor: color }]} />
+  );
+}
 
 export default function StatisticsScreen() {
   const router = useRouter();
@@ -85,26 +119,45 @@ export default function StatisticsScreen() {
 
       {!loading && !error ? (
         <>
-          <View style={[styles.statCard, styles.gamesCard]}>
-            <Text style={styles.statValue}>{stats.games}</Text>
-            <Text style={styles.statLabel}>Jogos</Text>
-          </View>
-          <View style={[styles.statCard, styles.winsCard]}>
-            <Text style={styles.statValue}>{stats.wins}</Text>
-            <Text style={styles.statLabel}>Vitórias</Text>
-          </View>
+          <StatCard
+            style={styles.gamesCard}
+            value={stats.games}
+            label="Jogos"
+            icon="football-outline"
+            iconColor={theme.colors.primary}
+            large
+          />
+          <StatCard
+            style={styles.winsCard}
+            value={stats.wins}
+            label="Vitórias"
+            icon="trophy-outline"
+            iconColor="#E8C547"
+            large
+          />
 
           <View style={[styles.statCard, styles.goalsCard]}>
+            <View style={[styles.statIconWrap, { backgroundColor: '#2ECC7122' }]}>
+              <Ionicons name="football" size={18} color="#2ECC71" />
+            </View>
             <Text style={styles.statValueSmall}>{stats.goals}</Text>
             <Text style={styles.statLabel}>Gols</Text>
           </View>
-          <View style={[styles.statCard, styles.assistsCard]}>
-            <Text style={styles.statValueSmall}>{stats.assists}</Text>
-            <Text style={styles.statLabel}>Assist.</Text>
+
+          <View style={[styles.statCard, styles.yellowCard]}>
+            <View style={[styles.statIconWrap, { backgroundColor: '#F5C51822' }]}>
+              <CardBadge color="#F5C518" />
+            </View>
+            <Text style={styles.statValueSmall}>{stats.yellowCards}</Text>
+            <Text style={styles.statLabel}>Amarelos</Text>
           </View>
-          <View style={[styles.statCard, styles.cardsCard]}>
-            <Text style={styles.statValueSmall}>{stats.cards}</Text>
-            <Text style={styles.statLabel}>Cartões</Text>
+
+          <View style={[styles.statCard, styles.redCard]}>
+            <View style={[styles.statIconWrap, { backgroundColor: '#E5393522' }]}>
+              <CardBadge color="#E53935" />
+            </View>
+            <Text style={styles.statValueSmall}>{stats.redCards}</Text>
+            <Text style={styles.statLabel}>Vermelhos</Text>
           </View>
 
           <Text style={styles.sectionTitle}>Últimos campeonatos</Text>
@@ -186,8 +239,8 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.surfaceCard,
     borderWidth: 1,
     borderColor: theme.colors.border,
-    paddingHorizontal: 16,
-    paddingVertical: 18,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
     justifyContent: 'center',
   },
   gamesCard: {
@@ -208,34 +261,49 @@ const styles = StyleSheet.create({
     width: 110,
     height: 96,
   },
-  assistsCard: {
+  yellowCard: {
     left: 140,
     top: 258,
     width: 110,
     height: 96,
   },
-  cardsCard: {
+  redCard: {
     left: 260,
     top: 258,
     width: 110,
     height: 96,
   },
+  statIconWrap: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 6,
+  },
+  cardBadge: {
+    width: 14,
+    height: 20,
+    borderRadius: 3,
+    borderWidth: 1,
+    transform: [{ rotate: '12deg' }],
+  },
   statValue: {
     color: theme.colors.primary,
-    fontSize: 40,
+    fontSize: 36,
     fontWeight: theme.fontWeights.extraBold,
-    lineHeight: 44,
+    lineHeight: 40,
   },
   statValueSmall: {
     color: theme.colors.primary,
-    fontSize: 32,
+    fontSize: 28,
     fontWeight: theme.fontWeights.extraBold,
-    lineHeight: 36,
+    lineHeight: 32,
   },
   statLabel: {
-    marginTop: 6,
+    marginTop: 4,
     color: '#A6A5B0',
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: theme.fontWeights.semibold,
   },
   sectionTitle: {

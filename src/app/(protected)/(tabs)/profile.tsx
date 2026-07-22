@@ -25,7 +25,7 @@ import {
 import { ApiError } from "@/lib/api/graphql";
 
 function isImagePickerAvailable(): boolean {
-  return requireOptionalNativeModule("ExpoImagePicker") != null;
+  return requireOptionalNativeModule("ExponentImagePicker") != null;
 }
 
 export default function ProfileScreen() {
